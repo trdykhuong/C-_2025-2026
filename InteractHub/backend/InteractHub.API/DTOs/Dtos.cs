@@ -197,3 +197,10 @@ public class ApiResponse<T>
     public static ApiResponse<T> Fail(List<string> errors) =>
         new() { Success = false, Errors = errors };
 }
+
+// ─── HASHTAGS ───────────────────────────────────────────
+public class HashtagTrendDto
+{
+    public string Name { get; set; } = string.Empty;
+    public int PostCount { get; set; }
+}

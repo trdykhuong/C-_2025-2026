@@ -28,13 +28,3 @@ public class HashtagsService : IHashtagsService
             .ToListAsync();
     }
 }
-
-// Add this DTO to DTOs file
-namespace InteractHub.API.DTOs
-{
-    public class HashtagTrendDto
-    {
-        public string Name { get; set; } = string.Empty;
-        public int PostCount { get; set; }
-    }
-}

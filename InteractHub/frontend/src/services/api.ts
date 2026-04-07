@@ -5,7 +5,8 @@ import type {
   Friendship, Story, Notification, PagedResult
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
+// Default to HTTPS dev URL (dotnet runs HTTPS on 5001). Can be overridden with VITE_API_URL.
+const API_BASE = import.meta.env.VITE_API_URL ?? 'https://localhost:5001';
 
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,

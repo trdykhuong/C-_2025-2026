@@ -5,7 +5,7 @@ import type { Post, Comment } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useComments } from '../../hooks';
 import { Avatar, Button, Card } from '../ui';
-import { postsApi } from '../../services/api';
+import { postsApi, api } from '../../services/api';
 
 // ─── POST CARD ────────────────────────────────────────────────────────────────
 interface PostCardProps {
@@ -169,6 +169,9 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({ onCreated }) => 
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [hashtags, setHashtags] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -210,6 +213,13 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({ onCreated }) => 
             {imageUrl && (
               <img src={imageUrl} alt="preview" className="mt-2 w-full max-h-48 object-cover rounded-lg" />
             )}
+            {selectedFile && previewUrl && (
+              (selectedFile.type.startsWith('image/') ? (
+                <img src={previewUrl} alt="preview" className="mt-2 w-full max-h-48 object-cover rounded-lg" />
+              ) : (
+                <video src={previewUrl} className="mt-2 w-full max-h-48 object-cover rounded-lg" controls />
+              ))
+            )}
           </div>
         </div>
 
@@ -222,6 +232,17 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({ onCreated }) => 
             placeholder="Image URL (optional)"
             className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 outline-none"
           />
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/*,video/*"
+              onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+              className="text-xs"
+            />
+            {selectedFile && (
+              <button type="button" onClick={() => setSelectedFile(null)} className="text-xs text-red-500 hover:underline">Remove</button>
+            )}
+          </div>
           <input
             value={hashtags}
             onChange={e => setHashtags(e.target.value)}
