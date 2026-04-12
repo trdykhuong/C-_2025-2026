@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\InteractHub",
+    "\\InteractHub\\backend",
+    "\\InteractHub\\backend\\InteractHub.API",
+    "\\InteractHub\\backend\\InteractHub.API\\Controllers",
+    "\\InteractHub\\docs"
+  ],
+  "SelectedNode": "\\InteractHub\\backend\\InteractHub.API\\Program.cs",
+  "PreviewInSolutionExplorer": false
+}
