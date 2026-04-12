@@ -9,7 +9,6 @@ using System.Linq;
 
 namespace InteractHub.API.Controllers;
 
-// ─── AUTH CONTROLLER ─────────────────────────────────────────────────────────
 [ApiController]
 [Route("api/auth")]
 public class AuthController : ControllerBase
@@ -17,7 +16,6 @@ public class AuthController : ControllerBase
     private readonly IAuthService _auth;
     public AuthController(IAuthService auth) => _auth = auth;
 
-    /// <summary>Register a new user account</summary>
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
@@ -25,7 +23,6 @@ public class AuthController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Login and receive JWT token</summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
@@ -33,7 +30,7 @@ public class AuthController : ControllerBase
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
-    /// <summary>Get current authenticated user info</summary>
+
     [HttpGet("me")]
     [Authorize]
     public IActionResult Me()
@@ -66,7 +63,6 @@ public class PostsController : ControllerBase
     public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         => Ok(await _posts.SearchAsync(q, UserId, page, pageSize));
 
-    /// <summary>Get a single post by id</summary>
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -74,7 +70,6 @@ public class PostsController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
-    /// <summary>Get all posts by a specific user</summary>
     [HttpGet("user/{userId}")]
     public async Task<IActionResult> GetUserPosts(string userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         => Ok(await _posts.GetUserPostsAsync(userId, UserId, page, pageSize));
