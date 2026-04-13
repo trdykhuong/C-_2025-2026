@@ -1,0 +1,181 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\HK2_2025-2026\\C-_2025-2026\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Models\\Post.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Models\\Post.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\Services.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:InteractHub\\backend\\InteractHub.API\\Services\\Services.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\Services\\HashtagsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Services\\HashtagsService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\HK2_2025-2026\\C-_2025-2026\\DTOs\\Dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:DTOs\\Dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 10,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Dtos.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\DTOs\\Dtos.cs",
+              "RelativeDocumentMoniker": "DTOs\\Dtos.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\DTOs\\Dtos.cs",
+              "RelativeToolTip": "DTOs\\Dtos.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T03:07:06.23Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "HashtagsService.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\Services\\HashtagsService.cs",
+              "RelativeDocumentMoniker": "Services\\HashtagsService.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\Services\\HashtagsService.cs",
+              "RelativeToolTip": "Services\\HashtagsService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T03:07:06.198Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Post.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Models\\Post.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Models\\Post.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Models\\Post.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Models\\Post.cs",
+              "ViewState": "AgIAAGYAAAAAAAAAAAAAADMAAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:50:07.709Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AppDbContext.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Data\\AppDbContext.cs",
+              "ViewState": "AgIAABIAAAAAAAAAAAAAABEAAAA+AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:49:56.989Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Services.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\Services.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Services\\Services.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\Services.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Services\\Services.cs",
+              "ViewState": "AgIAAPYAAAAAAAAAAAAAAAIBAAA3AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:47:21.73Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "PostsService.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Services\\PostsService.cs",
+              "ViewState": "AgIAACcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:35:15.267Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Controllers.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Controllers\\Controllers.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:31:13.466Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "HashtagsService.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\Services\\HashtagsService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:31:09.206Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Dtos.cs",
+              "DocumentMoniker": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs",
+              "RelativeDocumentMoniker": "InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs",
+              "ToolTip": "D:\\HK2_2025-2026\\C-_2025-2026\\InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs",
+              "RelativeToolTip": "InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAAAA4AAAA4AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-13T02:31:00.769Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

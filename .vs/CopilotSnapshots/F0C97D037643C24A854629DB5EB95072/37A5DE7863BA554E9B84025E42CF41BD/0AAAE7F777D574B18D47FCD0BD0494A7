@@ -1,0 +1,199 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace InteractHub.API.DTOs;
+
+// ─── AUTH ───────────────────────────────────────────────
+public class RegisterDto
+{
+    [Required, MaxLength(100)]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required, MinLength(3), MaxLength(50)]
+    public string UserName { get; set; } = string.Empty;
+
+    [Required, MinLength(8)]
+    public string Password { get; set; } = string.Empty;
+}
+
+public class LoginDto
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public string Password { get; set; } = string.Empty;
+}
+
+public class AuthResponseDto
+{
+    public string Token { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+    public IList<string> Roles { get; set; } = new List<string>();
+    public DateTime ExpiresAt { get; set; }
+}
+
+// ─── USERS ──────────────────────────────────────────────
+public class UserProfileDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string? Bio { get; set; }
+    public string? AvatarUrl { get; set; }
+    public string? CoverUrl { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int PostCount { get; set; }
+    public int FriendCount { get; set; }
+    public string FriendshipStatus { get; set; } = "none"; // none, pending, accepted
+}
+
+public class UpdateProfileDto
+{
+    [MaxLength(100)]
+    public string? FullName { get; set; }
+
+    [MaxLength(300)]
+    public string? Bio { get; set; }
+}
+
+// ─── POSTS ──────────────────────────────────────────────
+public class CreatePostDto
+{
+    [Required, MinLength(1), MaxLength(2000)]
+    public string Content { get; set; } = string.Empty;
+
+    public string? ImageUrl { get; set; }
+    public List<string> Hashtags { get; set; } = new();
+}
+
+public class UpdatePostDto
+{
+    [Required, MinLength(1), MaxLength(2000)]
+    public string Content { get; set; } = string.Empty;
+}
+
+public class PostResponseDto
+{
+    public int Id { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public UserSummaryDto Author { get; set; } = null!;
+    public int LikeCount { get; set; }
+    public int CommentCount { get; set; }
+    public bool IsLikedByCurrentUser { get; set; }
+    public List<string> Hashtags { get; set; } = new();
+}
+
+public class UserSummaryDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+}
+
+// ─── COMMENTS ───────────────────────────────────────────
+public class CreateCommentDto
+{
+    [Required, MinLength(1), MaxLength(1000)]
+    public string Content { get; set; } = string.Empty;
+}
+
+public class CommentResponseDto
+{
+    public int Id { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public UserSummaryDto Author { get; set; } = null!;
+}
+
+// ─── FRIENDS ────────────────────────────────────────────
+public class FriendRequestDto
+{
+    [Required]
+    public string ReceiverId { get; set; } = string.Empty;
+}
+
+public class FriendshipResponseDto
+{
+    public int Id { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public UserSummaryDto OtherUser { get; set; } = null!;
+}
+
+// ─── STORIES ────────────────────────────────────────────
+public class CreateStoryDto
+{
+    public string? ImageUrl { get; set; }
+
+    [MaxLength(300)]
+    public string? Caption { get; set; }
+}
+
+public class StoryResponseDto
+{
+    public int Id { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? Caption { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public UserSummaryDto Author { get; set; } = null!;
+}
+
+// ─── NOTIFICATIONS ──────────────────────────────────────
+public class NotificationResponseDto
+{
+    public int Id { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int? RelatedPostId { get; set; }
+    public UserSummaryDto? Actor { get; set; }
+}
+
+// ─── REPORTS ────────────────────────────────────────────
+public class CreateReportDto
+{
+    [Required, MaxLength(500)]
+    public string Reason { get; set; } = string.Empty;
+}
+
+// ─── PAGINATION ─────────────────────────────────────────
+public class PagedResultDto<T>
+{
+    public List<T> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
+
+// ─── API RESPONSE WRAPPER ───────────────────────────────
+public class ApiResponse<T>
+{
+    public bool Success { get; set; }
+    public T? Data { get; set; }
+    public string? Message { get; set; }
+    public List<string> Errors { get; set; } = new();
+
+    public static ApiResponse<T> Ok(T data, string? message = null) =>
+        new() { Success = true, Data = data, Message = message };
+
+    public static ApiResponse<T> Fail(string error) =>
+        new() { Success = false, Errors = new List<string> { error } };
+
+    public static ApiResponse<T> Fail(List<string> errors) =>
+        new() { Success = false, Errors = errors };
+}

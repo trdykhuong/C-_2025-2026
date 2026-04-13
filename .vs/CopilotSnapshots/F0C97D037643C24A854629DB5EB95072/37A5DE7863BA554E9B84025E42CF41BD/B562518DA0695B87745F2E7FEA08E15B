@@ -1,9 +1,7 @@
-using InteractHub.API.Data;
-using InteractHub.API.DTOs;
+﻿using InteractHub.API.DTOs;
 using InteractHub.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace InteractHub.API.Controllers;
@@ -268,7 +266,7 @@ public class UsersController : ControllerBase
 
     public UsersController(
         Microsoft.AspNetCore.Identity.UserManager<Models.AppUser> userManager,
-        AppDbContext db)
+        Data.AppDbContext db)
     {
         _userManager = userManager;
         _db = db;
@@ -347,7 +345,7 @@ public class ReportsController : ControllerBase
     private readonly AppDbContext _db;
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
-    public ReportsController(AppDbContext db) => _db = db;
+    public ReportsController(Data.AppDbContext db) => _db = db;
 
     /// <summary>Report a post</summary>
     [HttpPost("{postId:int}")]

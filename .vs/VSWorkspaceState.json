@@ -4,9 +4,12 @@
     "\\InteractHub",
     "\\InteractHub\\backend",
     "\\InteractHub\\backend\\InteractHub.API",
-    "\\InteractHub\\backend\\InteractHub.API\\Controllers",
-    "\\InteractHub\\docs"
+    "\\InteractHub\\backend\\InteractHub.API\\Data",
+    "\\InteractHub\\backend\\InteractHub.API\\DTOs",
+    "\\InteractHub\\backend\\InteractHub.API\\Models",
+    "\\InteractHub\\backend\\InteractHub.API\\Services",
+    "\\InteractHub\\{backend,frontend,docs}"
   ],
-  "SelectedNode": "\\InteractHub\\backend\\InteractHub.API\\Program.cs",
+  "SelectedNode": "\\InteractHub\\backend\\InteractHub.API\\DTOs\\Dtos.cs",
   "PreviewInSolutionExplorer": false
 }
