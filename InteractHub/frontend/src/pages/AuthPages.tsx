@@ -1,70 +1,74 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Mail, Lock, User, AtSign } from 'lucide-react';
+import { authApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Input, PasswordStrength } from '../components/ui';
-import type { LoginDto, RegisterDto } from '../types';
+
+// ─── PASSWORD STRENGTH ────────────────────────────────────────────────────────
+const PasswordStrength: React.FC<{ pwd: string }> = ({ pwd }) => {
+  const score = [pwd.length >= 8, /[A-Z]/.test(pwd), /[0-9]/.test(pwd), /[^a-zA-Z0-9]/.test(pwd)].filter(Boolean).length;
+  const labels = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
+  const colors = ['', 'bg-red-400', 'bg-yellow-400', 'bg-blue-400', 'bg-green-500'];
+  if (!pwd) return null;
+  return (
+    <div className="mt-1">
+      <div className="flex gap-1">
+        {[1,2,3,4].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i <= score ? colors[score] : 'bg-gray-200'}`} />)}
+      </div>
+      <p className="text-xs text-gray-500 mt-0.5">{labels[score]}</p>
+    </div>
+  );
+};
 
 // ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const [apiError, setApiError] = useState('');
+  const { setAuth } = useAuth();
+  const navigate    = useNavigate();
+  const [err, setErr] = useState('');
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<{ email: string; password: string }>();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginDto>();
-
-  const onSubmit = async (data: LoginDto) => {
-    setApiError('');
-    const result = await login(data);
-    if (result.success) navigate('/');
-    else setApiError(result.error ?? 'Login failed.');
+  const onSubmit = async (d: any) => {
+    setErr('');
+    const res = await authApi.login(d);
+    if (res.success && res.data) { setAuth(res.data); navigate('/'); }
+    else setErr(res.message ?? 'Đăng nhập thất bại.');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">InteractHub</h1>
-          <p className="text-gray-500 mt-1">Welcome back! Sign in to continue.</p>
-        </div>
+    <div className="min-h-screen bg-[#f0f2f5] flex flex-col items-center justify-center px-4">
+      <div className="text-center mb-6">
+        <h1 className="text-[#1877f2] text-5xl font-bold italic">interacthub</h1>
+        <p className="text-xl text-gray-600 mt-2">Kết nối với bạn bè và thế giới xung quanh.</p>
+      </div>
+      <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+          <input {...register('email', { required: 'Bắt buộc', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email không hợp lệ' } })}
+            type="email" placeholder="Email hoặc số điện thoại"
+            className="border border-gray-300 rounded-lg px-4 py-3 text-base outline-none focus:border-[#1877f2] focus:ring-2 focus:ring-blue-100" />
+          {errors.email && <p className="text-red-500 text-xs -mt-2">{errors.email.message}</p>}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            icon={<Mail size={16} />}
-            error={errors.email?.message}
-            {...register('email', {
-              required: 'Email is required.',
-              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email format.' }
-            })}
-          />
+          <input {...register('password', { required: 'Bắt buộc', minLength: { value: 8, message: 'Tối thiểu 8 ký tự' } })}
+            type="password" placeholder="Mật khẩu"
+            className="border border-gray-300 rounded-lg px-4 py-3 text-base outline-none focus:border-[#1877f2] focus:ring-2 focus:ring-blue-100" />
+          {errors.password && <p className="text-red-500 text-xs -mt-2">{errors.password.message}</p>}
 
-          <Input
-            label="Password"
-            type="password"
-            placeholder="Your password"
-            icon={<Lock size={16} />}
-            error={errors.password?.message}
-            {...register('password', {
-              required: 'Password is required.',
-              minLength: { value: 8, message: 'Password must be at least 8 characters.' }
-            })}
-          />
+          {err && <p className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{err}</p>}
 
-          {apiError && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{apiError}</div>
-          )}
+          <button type="submit" disabled={isSubmitting}
+            className="bg-[#1877f2] text-white font-bold py-3 rounded-lg text-lg hover:bg-blue-600 transition disabled:opacity-60">
+            {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
+          </button>
 
-          <Button type="submit" className="w-full" loading={isSubmitting}>Sign In</Button>
+          <div className="text-center">
+            <a href="#" className="text-[#1877f2] text-sm hover:underline">Quên mật khẩu?</a>
+          </div>
+          <div className="border-t border-gray-200 pt-4 text-center">
+            <Link to="/register"
+              className="bg-[#42b72a] text-white font-bold px-6 py-2.5 rounded-lg hover:bg-green-600 transition inline-block">
+              Tạo tài khoản mới
+            </Link>
+          </div>
         </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-blue-600 font-medium hover:underline">Sign up</Link>
-        </p>
       </div>
     </div>
   );
@@ -72,105 +76,70 @@ export const LoginPage: React.FC = () => {
 
 // ─── REGISTER PAGE ────────────────────────────────────────────────────────────
 export const RegisterPage: React.FC = () => {
-  const { register: registerUser } = useAuth();
-  const navigate = useNavigate();
-  const [apiError, setApiError] = useState('');
+  const { setAuth } = useAuth();
+  const navigate    = useNavigate();
+  const [err, setErr] = useState('');
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<any>();
+  const pwd = watch('password', '');
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterDto & { confirmPassword: string }>();
-  const password = watch('password', '');
-
-  const onSubmit = async (data: RegisterDto & { confirmPassword: string }) => {
-    setApiError('');
-    const { confirmPassword, ...dto } = data;
-    const result = await registerUser(dto);
-    if (result.success) navigate('/');
-    else setApiError(result.error ?? 'Registration failed.');
+  const onSubmit = async (d: any) => {
+    if (d.password !== d.confirmPassword) { setErr('Mật khẩu xác nhận không khớp.'); return; }
+    setErr('');
+    const { confirmPassword, ...dto } = d;
+    const res = await authApi.register(dto);
+    if (res.success && res.data) { setAuth(res.data); navigate('/'); }
+    else setErr(res.message ?? 'Đăng ký thất bại.');
   };
 
+  const inputClass = "border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1877f2] focus:ring-2 focus:ring-blue-100";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">InteractHub</h1>
-          <p className="text-gray-500 mt-1">Create your account today</p>
+    <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold">Tạo tài khoản mới</h1>
+          <p className="text-gray-500 text-sm">Nhanh chóng và dễ dàng.</p>
         </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+          <input {...register('fullName', { required: 'Bắt buộc', minLength: { value: 2, message: 'Tối thiểu 2 ký tự' } })}
+            placeholder="Họ và tên" className={inputClass} />
+          {errors.fullName && <p className="text-red-500 text-xs -mt-2">{String(errors.fullName.message)}</p>}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Full Name"
-            placeholder="John Doe"
-            icon={<User size={16} />}
-            error={errors.fullName?.message}
-            {...register('fullName', {
-              required: 'Full name is required.',
-              minLength: { value: 2, message: 'Name too short.' },
-              maxLength: { value: 100, message: 'Name too long.' }
-            })}
-          />
+          <input {...register('userName', { required: 'Bắt buộc', minLength: { value: 3, message: 'Tối thiểu 3 ký tự' }, pattern: { value: /^[a-zA-Z0-9_]+$/, message: 'Chỉ chữ, số và _' } })}
+            placeholder="Tên người dùng (username)" className={inputClass} />
+          {errors.userName && <p className="text-red-500 text-xs -mt-2">{String(errors.userName.message)}</p>}
 
-          <Input
-            label="Username"
-            placeholder="johndoe"
-            icon={<AtSign size={16} />}
-            error={errors.userName?.message}
-            {...register('userName', {
-              required: 'Username is required.',
-              minLength: { value: 3, message: 'Username must be at least 3 characters.' },
-              maxLength: { value: 50, message: 'Username too long.' },
-              pattern: { value: /^[a-zA-Z0-9_]+$/, message: 'Only letters, numbers and underscores.' }
-            })}
-          />
-
-          <Input
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            icon={<Mail size={16} />}
-            error={errors.email?.message}
-            {...register('email', {
-              required: 'Email is required.',
-              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email format.' }
-            })}
-          />
+          <input {...register('email', { required: 'Bắt buộc', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email không hợp lệ' } })}
+            type="email" placeholder="Email" className={inputClass} />
+          {errors.email && <p className="text-red-500 text-xs -mt-2">{String(errors.email.message)}</p>}
 
           <div>
-            <Input
-              label="Password"
-              type="password"
-              placeholder="Min. 8 characters"
-              icon={<Lock size={16} />}
-              error={errors.password?.message}
-              {...register('password', {
-                required: 'Password is required.',
-                minLength: { value: 8, message: 'At least 8 characters required.' }
-              })}
-            />
-            <PasswordStrength password={password} />
+            <input {...register('password', { required: 'Bắt buộc', minLength: { value: 8, message: 'Tối thiểu 8 ký tự' } })}
+              type="password" placeholder="Mật khẩu mới" className={`${inputClass} w-full`} />
+            {errors.password && <p className="text-red-500 text-xs mt-1">{String(errors.password.message)}</p>}
+            <PasswordStrength pwd={pwd} />
           </div>
 
-          <Input
-            label="Confirm Password"
-            type="password"
-            placeholder="Repeat your password"
-            icon={<Lock size={16} />}
-            error={errors.confirmPassword?.message}
-            {...register('confirmPassword', {
-              required: 'Please confirm your password.',
-              validate: val => val === password || 'Passwords do not match.'
-            })}
-          />
+          <input {...register('confirmPassword', { required: 'Bắt buộc' })}
+            type="password" placeholder="Xác nhận mật khẩu" className={inputClass} />
 
-          {apiError && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{apiError}</div>
-          )}
+          {err && <p className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{err}</p>}
 
-          <Button type="submit" className="w-full" loading={isSubmitting}>Create Account</Button>
+          <p className="text-xs text-gray-500 text-center">
+            Bằng cách nhấp vào Đăng ký, bạn đồng ý với <a href="#" className="text-[#1877f2]">Điều khoản</a> của chúng tôi.
+          </p>
+
+          <button type="submit" disabled={isSubmitting}
+            className="bg-[#42b72a] text-white font-bold py-2.5 rounded-lg hover:bg-green-600 transition disabled:opacity-60">
+            {isSubmitting ? 'Đang đăng ký...' : 'Đăng ký'}
+          </button>
+
+          <div className="text-center border-t border-gray-200 pt-3">
+            <Link to="/login" className="text-[#1877f2] font-medium text-sm hover:underline">
+              Bạn đã có tài khoản?
+            </Link>
+          </div>
         </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-blue-600 font-medium hover:underline">Sign in</Link>
-        </p>
       </div>
     </div>
   );

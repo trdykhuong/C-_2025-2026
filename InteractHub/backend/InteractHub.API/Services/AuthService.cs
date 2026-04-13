@@ -1,94 +1,109 @@
-using InteractHub.API.DTOs;
-using InteractHub.API.Models;
-using InteractHub.API.Services.Interfaces;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using InteractHub.API.DTOs;
+using InteractHub.API.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
 
 namespace InteractHub.API.Services;
 
-public class AuthService : IAuthService
+public class AuthService
 {
     private readonly UserManager<AppUser> _userManager;
-    private readonly IConfiguration _config;
+    private readonly IConfiguration      _config;
 
     public AuthService(UserManager<AppUser> userManager, IConfiguration config)
     {
         _userManager = userManager;
-        _config = config;
+        _config      = config;
     }
 
-    public async Task<ApiResponse<AuthResponseDto>> RegisterAsync(RegisterDto dto)
+    // ── Đăng ký tài khoản mới ────────────────────────────────────────────────
+    public async Task<ApiResult<AuthResponseDTO>> RegisterAsync(RegisterDTO dto)
     {
-        var existingUser = await _userManager.FindByEmailAsync(dto.Email);
-        if (existingUser != null)
-            return ApiResponse<AuthResponseDto>.Fail("Email already in use.");
+        // Kiểm tra email đã tồn tại chưa
+        if (await _userManager.FindByEmailAsync(dto.Email) != null)
+            return ApiResult<AuthResponseDTO>.Fail("Email đã được sử dụng.");
+
+        // Kiểm tra username đã tồn tại chưa
+        if (await _userManager.FindByNameAsync(dto.UserName) != null)
+            return ApiResult<AuthResponseDTO>.Fail("Username đã được sử dụng.");
 
         var user = new AppUser
         {
             FullName = dto.FullName,
-            Email = dto.Email,
             UserName = dto.UserName,
+            Email    = dto.Email,
         };
 
         var result = await _userManager.CreateAsync(user, dto.Password);
         if (!result.Succeeded)
-            return ApiResponse<AuthResponseDto>.Fail(result.Errors.Select(e => e.Description).ToList());
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return ApiResult<AuthResponseDTO>.Fail(errors);
+        }
 
+        // Gán role mặc định là "User"
         await _userManager.AddToRoleAsync(user, "User");
 
-        var token = await GenerateTokenAsync(user);
-        return ApiResponse<AuthResponseDto>.Ok(token, "Registration successful.");
+        var response = await BuildTokenAsync(user);
+        return ApiResult<AuthResponseDTO>.Ok(response, "Đăng ký thành công!");
     }
 
-    public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto)
+    // ── Đăng nhập ────────────────────────────────────────────────────────────
+    public async Task<ApiResult<AuthResponseDTO>> LoginAsync(LoginDTO dto)
     {
         var user = await _userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await _userManager.CheckPasswordAsync(user, dto.Password))
-            return ApiResponse<AuthResponseDto>.Fail("Invalid email or password.");
+        if (user == null)
+            return ApiResult<AuthResponseDTO>.Fail("Email hoặc mật khẩu không đúng.");
 
         if (!user.IsActive)
-            return ApiResponse<AuthResponseDto>.Fail("Account is deactivated.");
+            return ApiResult<AuthResponseDTO>.Fail("Tài khoản đã bị khóa.");
 
-        var token = await GenerateTokenAsync(user);
-        return ApiResponse<AuthResponseDto>.Ok(token);
+        var passwordOk = await _userManager.CheckPasswordAsync(user, dto.Password);
+        if (!passwordOk)
+            return ApiResult<AuthResponseDTO>.Fail("Email hoặc mật khẩu không đúng.");
+
+        var response = await BuildTokenAsync(user);
+        return ApiResult<AuthResponseDTO>.Ok(response);
     }
 
-    private async Task<AuthResponseDto> GenerateTokenAsync(AppUser user)
+    // ── Tạo JWT token ─────────────────────────────────────────────────────────
+    private async Task<AuthResponseDTO> BuildTokenAsync(AppUser user)
     {
-        var roles = await _userManager.GetRolesAsync(user);
-        var jwtSection = _config.GetSection("Jwt");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
-        var expires = DateTime.UtcNow.AddHours(double.Parse(jwtSection["ExpiresHours"] ?? "24"));
+        var roles   = await _userManager.GetRolesAsync(user);
+        var jwtConf = _config.GetSection("Jwt");
+        var key     = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConf["Key"]!));
+        var expired = DateTime.UtcNow.AddHours(double.Parse(jwtConf["ExpiresHours"] ?? "24"));
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Name, user.UserName!),
-            new Claim(ClaimTypes.Email, user.Email!),
-            new Claim("fullName", user.FullName),
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new(ClaimTypes.Name,           user.UserName!),
+            new(ClaimTypes.Email,          user.Email!),
+            new("fullName",                user.FullName),
         };
-        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        foreach (var role in roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
 
         var token = new JwtSecurityToken(
-            issuer: jwtSection["Issuer"],
-            audience: jwtSection["Audience"],
-            claims: claims,
-            expires: expires,
+            issuer:             jwtConf["Issuer"],
+            audience:           jwtConf["Audience"],
+            claims:             claims,
+            expires:            expired,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         );
 
-        return new AuthResponseDto
+        return new AuthResponseDTO
         {
-            Token = new JwtSecurityTokenHandler().WriteToken(token),
-            UserId = user.Id,
-            UserName = user.UserName!,
-            FullName = user.FullName,
+            Token     = new JwtSecurityTokenHandler().WriteToken(token),
+            UserId    = user.Id,
+            UserName  = user.UserName!,
+            FullName  = user.FullName,
             AvatarUrl = user.AvatarUrl,
-            Roles = roles,
-            ExpiresAt = expires
+            Roles     = roles,
+            ExpiredAt = expired,
         };
     }
 }

@@ -1,118 +1,104 @@
 import axios from 'axios';
-import type {
-  ApiResponse, AuthResponse, LoginDto, RegisterDto,
-  Post, Comment, CreatePostDto, UserProfile, UserSummary,
-  Friendship, Story, Notification, PagedResult
-} from '../types';
+import type { ApiResult, PagedResult, Post, Comment, UserProfile, UserSummary, Friendship, Story, Notification, AuthUser } from '../types';
 
-// Default to HTTPS dev URL (dotnet runs HTTPS on 5001). Can be overridden with VITE_API_URL.
-const API_BASE = import.meta.env.VITE_API_URL ?? 'https://localhost:5001';
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
-export const api = axios.create({
-  baseURL: `${API_BASE}/api`,
-  headers: { 'Content-Type': 'application/json' },
-});
+export const http = axios.create({ baseURL: `${BASE}/api` });
 
-// Inject token into every request
-api.interceptors.request.use((config) => {
+// Tự động gắn JWT vào header
+http.interceptors.request.use(cfg => {
   const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
 });
 
-// Handle 401 globally
-api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+// 401 → về trang login
+http.interceptors.response.use(
+  r => r,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.clear();
       window.location.href = '/login';
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
+// ── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (dto: RegisterDto) =>
-    api.post<ApiResponse<AuthResponse>>('/auth/register', dto),
-  login: (dto: LoginDto) =>
-    api.post<ApiResponse<AuthResponse>>('/auth/login', dto),
-  me: () =>
-    api.get<ApiResponse<{ userId: string; userName: string; fullName: string }>>('/auth/me'),
+  register: (d: any) => http.post<ApiResult<AuthUser>>('/auth/register', d).then(r => r.data),
+  login:    (d: any) => http.post<ApiResult<AuthUser>>('/auth/login',    d).then(r => r.data),
 };
 
-// ─── POSTS ───────────────────────────────────────────────────────────────────
+// ── Posts ─────────────────────────────────────────────────────────────────────
 export const postsApi = {
-  getFeed: (page = 1, pageSize = 10) =>
-    api.get<PagedResult<Post>>(`/posts/feed?page=${page}&pageSize=${pageSize}`),
-  getById: (id: number) =>
-    api.get<ApiResponse<Post>>(`/posts/${id}`),
-  getUserPosts: (userId: string, page = 1) =>
-    api.get<PagedResult<Post>>(`/posts/user/${userId}?page=${page}`),
-  search: (q: string, page = 1) =>
-    api.get<PagedResult<Post>>(`/posts/search?q=${encodeURIComponent(q)}&page=${page}`),
-  create: (dto: CreatePostDto) =>
-    api.post<ApiResponse<Post>>('/posts', dto),
-  update: (id: number, content: string) =>
-    api.put<ApiResponse<Post>>(`/posts/${id}`, { content }),
-  delete: (id: number) =>
-    api.delete<ApiResponse<boolean>>(`/posts/${id}`),
-  toggleLike: (id: number) =>
-    api.post<ApiResponse<boolean>>(`/posts/${id}/like`),
+  getFeed:       (page = 1)              => http.get<PagedResult<Post>>(`/posts/feed?page=${page}`).then(r => r.data),
+  getByUser:     (uid: string, page = 1) => http.get<PagedResult<Post>>(`/posts/user/${uid}?page=${page}`).then(r => r.data),
+  search:        (kw: string)            => http.get<PagedResult<Post>>(`/posts/search?keyword=${encodeURIComponent(kw)}`).then(r => r.data),
+  getByHashtag:  (tag: string, page = 1) => http.get<PagedResult<Post>>(`/posts/hashtag/${encodeURIComponent(tag)}?page=${page}`).then(r => r.data),
+  create:        (d: any)                => http.post<ApiResult<Post>>('/posts', d),
+  delete:        (id: number)            => http.delete<ApiResult<boolean>>(`/posts/${id}`),
+  toggleLike:    (id: number)            => http.post<ApiResult<boolean>>(`/posts/${id}/like`),
 };
 
-// ─── COMMENTS ────────────────────────────────────────────────────────────────
+// ── Comments ──────────────────────────────────────────────────────────────────
 export const commentsApi = {
-  getByPost: (postId: number) =>
-    api.get<ApiResponse<Comment[]>>(`/posts/${postId}/comments`),
-  create: (postId: number, content: string) =>
-    api.post<ApiResponse<Comment>>(`/posts/${postId}/comments`, { content }),
-  delete: (postId: number, commentId: number) =>
-    api.delete<ApiResponse<boolean>>(`/posts/${postId}/comments/${commentId}`),
+  getAll: (postId: number)                              => http.get<Comment[]>(`/posts/${postId}/comments`).then(r => ({ data: r.data })),
+  create: (postId: number, content: string)             => http.post<ApiResult<Comment>>(`/posts/${postId}/comments`, { content }),
+  update: (postId: number, cid: number, content: string) => http.put<ApiResult<Comment>>(`/posts/${postId}/comments/${cid}`, { content }),
+  delete: (postId: number, cid: number)                 => http.delete(`/posts/${postId}/comments/${cid}`),
 };
 
-// ─── USERS ───────────────────────────────────────────────────────────────────
+// ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
-  getProfile: (id: string) =>
-    api.get<ApiResponse<UserProfile>>(`/users/${id}`),
-  updateProfile: (data: { fullName?: string; bio?: string }) =>
-    api.put<ApiResponse<boolean>>('/users/me', data),
-  search: (q: string) =>
-    api.get<ApiResponse<UserSummary[]>>(`/users/search?q=${encodeURIComponent(q)}`),
+  getProfile: (id: string) => http.get<ApiResult<UserProfile>>(`/users/${id}`).then(r => r.data),
+  update:     (d: any)     => http.put<ApiResult<boolean>>('/users/me', d),
+  search:     (kw: string) => http.get<UserSummary[]>(`/users/search?keyword=${encodeURIComponent(kw)}`).then(r => ({ data: r.data })),
 };
 
-// ─── FRIENDS ─────────────────────────────────────────────────────────────────
+// ── Friends ───────────────────────────────────────────────────────────────────
 export const friendsApi = {
-  getFriends: () =>
-    api.get<ApiResponse<Friendship[]>>('/friends'),
-  getPendingRequests: () =>
-    api.get<ApiResponse<Friendship[]>>('/friends/requests'),
-  sendRequest: (receiverId: string) =>
-    api.post<ApiResponse<Friendship>>('/friends/request', { receiverId }),
-  respondToRequest: (id: number, accept: boolean) =>
-    api.put<ApiResponse<Friendship>>(`/friends/request/${id}?accept=${accept}`),
-  removeFriend: (id: number) =>
-    api.delete<ApiResponse<boolean>>(`/friends/${id}`),
+  list:           ()                            => http.get<Friendship[]>('/friends').then(r => r.data),
+  pending:        ()                            => http.get<Friendship[]>('/friends/requests').then(r => r.data),
+  send:           (receiverId: string)          => http.post('/friends/request', { receiverId }),
+  respond:        (id: number, accept: boolean) => http.put(`/friends/request/${id}?accept=${accept}`),
+  remove:         (id: number)                  => http.delete(`/friends/${id}`),
+  removeByUserId: (userId: string)              => http.delete(`/friends/with/${userId}`),
 };
 
-// ─── STORIES ─────────────────────────────────────────────────────────────────
+// ── Stories ───────────────────────────────────────────────────────────────────
 export const storiesApi = {
-  getFeed: () =>
-    api.get<ApiResponse<Story[]>>('/stories'),
-  create: (data: { imageUrl?: string; caption?: string }) =>
-    api.post<ApiResponse<Story>>('/stories', data),
-  delete: (id: number) =>
-    api.delete<ApiResponse<boolean>>(`/stories/${id}`),
+  list:        ()            => http.get<Story[]>('/stories').then(r => r.data),
+  create:      (d: any)      => http.post<ApiResult<Story>>('/stories', d).then(r => r.data),
+  recordView:  (id: number)  => http.post(`/stories/${id}/view`),
+  delete:      (id: number)  => http.delete(`/stories/${id}`),
 };
 
-// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+// ── Upload ────────────────────────────────────────────────────────────────────
+export const uploadApi = {
+  upload: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http.post<{ success: boolean; url: string }>('/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+};
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+export const adminApi = {
+  getStats:       ()                                => http.get<any>('/admin/stats').then(r => r.data),
+  getUsers:       (page = 1, keyword = '')          => http.get<any>(`/admin/users?page=${page}&keyword=${encodeURIComponent(keyword)}`).then(r => r.data),
+  toggleActive:   (id: string)                      => http.put<any>(`/admin/users/${id}/toggle-active`).then(r => r.data),
+  getPosts:       (page = 1, keyword = '')          => http.get<any>(`/admin/posts?page=${page}&keyword=${encodeURIComponent(keyword)}`).then(r => r.data),
+  deletePost:     (id: number)                      => http.delete<any>(`/admin/posts/${id}`).then(r => r.data),
+  getReports:     (status = 'pending')              => http.get<any[]>(`/admin/reports?status=${status}`).then(r => r.data),
+  updateReport:   (id: number, status: string)      => http.put<any>(`/admin/reports/${id}?status=${status}`).then(r => r.data),
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationsApi = {
-  getAll: () =>
-    api.get<ApiResponse<Notification[]>>('/notifications'),
-  markAsRead: (id: number) =>
-    api.put<ApiResponse<boolean>>(`/notifications/${id}/read`),
-  markAllAsRead: () =>
-    api.put<ApiResponse<boolean>>('/notifications/read-all'),
+  getAll:      ()           => http.get<Notification[]>('/notifications').then(r => ({ data: r.data })),
+  markRead:    (id: number) => http.put(`/notifications/${id}/read`),
+  markAllRead: ()           => http.put('/notifications/read-all'),
 };

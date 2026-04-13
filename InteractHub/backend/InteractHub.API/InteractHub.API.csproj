@@ -8,13 +8,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <!-- ASP.NET Core Identity + EF Core -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"     Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11" />
-    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.3.1" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.3.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"           Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools"               Version="8.0.11" />
+
+    <!-- JWT -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt"  Version="7.3.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens"    Version="7.3.1" />
+
+    <!-- Swagger -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+
+    <!-- SignalR (already in ASP.NET Core, no extra package needed for basic use) -->
   </ItemGroup>
 
 </Project>

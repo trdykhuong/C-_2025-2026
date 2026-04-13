@@ -1,117 +1,106 @@
+using System.Text;
 using InteractHub.API.Data;
-using InteractHub.API.Hubs;
 using InteractHub.API.Models;
 using InteractHub.API.Services;
-using InteractHub.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ─── DATABASE ────────────────────────────────────────────────────────────────
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-// ─── IDENTITY ────────────────────────────────────────────────────────────────
-builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
+// ─── 1. DATABASE ──────────────────────────────────────────────────────────────
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// ─── 2. IDENTITY ─────────────────────────────────────────────────────────────
+builder.Services.AddIdentity<AppUser, IdentityRole>(opt =>
 {
-    options.Password.RequireDigit = true;
-    options.Password.RequiredLength = 8;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.User.RequireUniqueEmail = true;
+    opt.Password.RequireDigit           = true;
+    opt.Password.RequiredLength         = 8;
+    opt.Password.RequireUppercase       = false;
+    opt.Password.RequireNonAlphanumeric = false;
+    opt.User.RequireUniqueEmail         = true;
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-// ─── JWT AUTHENTICATION ───────────────────────────────────────────────────────
-var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("JWT Key not configured.");
+// ─── 3. JWT AUTH ─────────────────────────────────────────────────────────────
+var jwtKey    = builder.Configuration["Jwt:Key"]!;
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
+var jwtAud    = builder.Configuration["Jwt:Audience"]!;
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+builder.Services
+    .AddAuthentication(opt =>
     {
-        ValidateIssuer           = true,
-        ValidateAudience         = true,
-        ValidateLifetime         = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer              = jwtSection["Issuer"],
-        ValidAudience            = jwtSection["Audience"],
-        IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
-    };
-
-    // Support JWT via SignalR query string
-    options.Events = new JwtBearerEvents
+        opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        opt.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(opt =>
     {
-        OnMessageReceived = ctx =>
+        opt.TokenValidationParameters = new TokenValidationParameters
         {
-            var token = ctx.Request.Query["access_token"];
-            if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
-                ctx.Token = token;
-            return Task.CompletedTask;
-        }
-    };
-});
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer              = jwtIssuer,
+            ValidAudience            = jwtAud,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        };
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-});
+        // Cho phép SignalR lấy JWT từ query string
+        opt.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var token = ctx.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            }
+        };
+    });
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+builder.Services.AddAuthorization();
+
+// ─── 4. CORS (cho phép React frontend) ───────────────────────────────────────
 var frontendUrl = builder.Configuration["Frontend:Url"] ?? "http://localhost:5173";
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("ReactApp", policy =>
-        policy.WithOrigins(frontendUrl, "http://localhost:3000", "http://localhost:5173")
+builder.Services.AddCors(opt =>
+    opt.AddPolicy("ReactApp", policy =>
+        policy.WithOrigins(frontendUrl, "http://localhost:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials());
-});
+              .AllowCredentials()));
 
-// ─── SERVICES ─────────────────────────────────────────────────────────────────
-builder.Services.AddScoped<IAuthService,          AuthService>();
-builder.Services.AddScoped<IPostsService,         PostsService>();
-builder.Services.AddScoped<ICommentsService,      CommentsService>();
-builder.Services.AddScoped<IFriendsService,       FriendsService>();
-builder.Services.AddScoped<IStoriesService,       StoriesService>();
-builder.Services.AddScoped<INotificationsService, NotificationsService>();
-builder.Services.AddScoped<IFileUploadService,    FileUploadService>();
-builder.Services.AddScoped<IUsersService,         UsersService>();
-builder.Services.AddScoped<IHashtagsService,      HashtagsService>();
+// ─── 5. SERVICES (Dependency Injection) ──────────────────────────────────────
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<NotificationService>(); // NotificationService phải đăng ký trước vì PostService cần nó
+builder.Services.AddScoped<PostService>();
+builder.Services.AddScoped<CommentService>();
+builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<StoryService>();
+builder.Services.AddScoped<UserService>();
 
-// ─── SIGNALR ──────────────────────────────────────────────────────────────────
+// ─── 6. SIGNALR ──────────────────────────────────────────────────────────────
 builder.Services.AddSignalR();
 
-// ─── SWAGGER ──────────────────────────────────────────────────────────────────
+// ─── 7. SWAGGER ──────────────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title       = "InteractHub API",
-        Version     = "v1",
-        Description = "Social Media Web Application – Spring 2026"
-    });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "InteractHub API", Version = "v1" });
 
+    // Cho phép nhập JWT trong Swagger UI
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization. Enter: Bearer {token}",
+        Description = "Nhập token: Bearer {token}",
         Name        = "Authorization",
         In          = ParameterLocation.Header,
         Type        = SecuritySchemeType.ApiKey,
-        Scheme      = "Bearer"
+        Scheme      = "Bearer",
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -126,58 +115,61 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddControllers();
 
-// ─── BUILD ────────────────────────────────────────────────────────────────────
+// Cho phép upload file multipart
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 52428800; // 50 MB
+});
+
+// ─── BUILD APP ────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// Auto-migrate and seed roles on startup
+// Tự động tạo schema khi start
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    try
-    {
-        // Apply migrations first
-        db.Database.Migrate();
+    db.Database.EnsureCreated();
 
-        // Only after migrations succeeded, ensure default roles exist
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        Task.Run(async () =>
-        {
-            var roles = new[] { "Admin", "User" };
-            foreach (var role in roles)
-            {
-                if (!await roleManager.RoleExistsAsync(role))
-                {
-                    await roleManager.CreateAsync(new IdentityRole(role));
-                }
-            }
-        }).GetAwaiter().GetResult();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Migration or role seeding failed – continuing startup.");
-    }
+    // Thêm cột/bảng mới cho DB đã tồn tại (idempotent)
+    try { db.Database.ExecuteSqlRaw(
+        "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Posts' AND COLUMN_NAME='Visibility') " +
+        "ALTER TABLE Posts ADD Visibility nvarchar(20) NOT NULL DEFAULT 'public'"); } catch { }
+
+    try { db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StoryViews')
+        CREATE TABLE StoryViews (
+            Id int IDENTITY(1,1) NOT NULL,
+            ViewedAt datetime2 NOT NULL DEFAULT GETUTCDATE(),
+            StoryId int NOT NULL,
+            UserId nvarchar(450) NOT NULL,
+            CONSTRAINT PK_StoryViews PRIMARY KEY (Id),
+            CONSTRAINT FK_StoryViews_Stories FOREIGN KEY (StoryId) REFERENCES Stories(Id) ON DELETE CASCADE,
+            CONSTRAINT FK_StoryViews_Users   FOREIGN KEY (UserId)   REFERENCES AspNetUsers(Id)
+        )"); } catch { }
+
+    try { db.Database.ExecuteSqlRaw(
+        "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Stories' AND COLUMN_NAME='Visibility') " +
+        "ALTER TABLE Stories ADD Visibility nvarchar(20) NOT NULL DEFAULT 'public'"); } catch { }
+
+    // Tạo thư mục uploads nếu chưa có
+    var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+    Directory.CreateDirectory(uploadsDir);
 }
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "InteractHub API v1");
-        c.RoutePrefix = "swagger";
-    });
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // phục vụ wwwroot/uploads
 app.UseCors("ReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-app.MapHub<NotificationHub>("/hubs/notifications");
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+// Endpoint kiểm tra server còn sống
+app.MapGet("/health", () => Results.Ok(new { status = "OK", time = DateTime.UtcNow }));
 
 app.Run();
