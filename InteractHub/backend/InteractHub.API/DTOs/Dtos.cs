@@ -2,205 +2,204 @@ using System.ComponentModel.DataAnnotations;
 
 namespace InteractHub.API.DTOs;
 
-// ─── AUTH ───────────────────────────────────────────────
-public class RegisterDto
+// ════════════════════════════════════════════════════════════
+// SHARED - dùng ở nhiều nơi
+// ════════════════════════════════════════════════════════════
+public class ApiResult<T>
 {
-    [Required, MaxLength(100)]
-    public string FullName { get; set; } = string.Empty;
+    public bool   Success { get; set; }
+    public T?     Data    { get; set; }
+    public string Message { get; set; } = string.Empty;
 
-    [Required, EmailAddress]
-    public string Email { get; set; } = string.Empty;
+    public static ApiResult<T> Ok(T data, string msg = "")
+        => new() { Success = true, Data = data, Message = msg };
 
-    [Required, MinLength(3), MaxLength(50)]
-    public string UserName { get; set; } = string.Empty;
-
-    [Required, MinLength(8)]
-    public string Password { get; set; } = string.Empty;
+    public static ApiResult<T> Fail(string msg)
+        => new() { Success = false, Message = msg };
 }
 
-public class LoginDto
+public class PagedResult<T>
 {
-    [Required, EmailAddress]
-    public string Email { get; set; } = string.Empty;
-
-    [Required]
-    public string Password { get; set; } = string.Empty;
+    public List<T> Items      { get; set; } = new();
+    public int     TotalCount { get; set; }
+    public int     Page       { get; set; }
+    public int     PageSize   { get; set; }
+    public bool    HasNext    => Page * PageSize < TotalCount;
 }
 
-public class AuthResponseDto
+public class UserSummaryDTO
 {
-    public string Token { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
-    public string UserName { get; set; } = string.Empty;
-    public string FullName { get; set; } = string.Empty;
+    public string  Id        { get; set; } = string.Empty;
+    public string  UserName  { get; set; } = string.Empty;
+    public string  FullName  { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
-    public IList<string> Roles { get; set; } = new List<string>();
-    public DateTime ExpiresAt { get; set; }
 }
 
-// ─── USERS ──────────────────────────────────────────────
-public class UserProfileDto
+// ════════════════════════════════════════════════════════════
+// AUTH DTO
+// ════════════════════════════════════════════════════════════
+public class RegisterDTO
 {
-    public string Id { get; set; } = string.Empty;
-    public string UserName { get; set; } = string.Empty;
-    public string FullName { get; set; } = string.Empty;
-    public string? Bio { get; set; }
+    [Required, MaxLength(100)]  public string FullName { get; set; } = string.Empty;
+    [Required, MaxLength(50)]   public string UserName { get; set; } = string.Empty;
+    [Required, EmailAddress]    public string Email    { get; set; } = string.Empty;
+    [Required, MinLength(8)]    public string Password { get; set; } = string.Empty;
+}
+
+public class LoginDTO
+{
+    [Required, EmailAddress] public string Email    { get; set; } = string.Empty;
+    [Required]               public string Password { get; set; } = string.Empty;
+}
+
+public class AuthResponseDTO
+{
+    public string        Token    { get; set; } = string.Empty;
+    public string        UserId   { get; set; } = string.Empty;
+    public string        UserName { get; set; } = string.Empty;
+    public string        FullName { get; set; } = string.Empty;
+    public string?       AvatarUrl{ get; set; }
+    public IList<string> Roles    { get; set; } = new List<string>();
+    public DateTime      ExpiredAt{ get; set; }
+}
+
+// ════════════════════════════════════════════════════════════
+// USER DTO
+// ════════════════════════════════════════════════════════════
+public class UserProfileDTO
+{
+    public string  Id               { get; set; } = string.Empty;
+    public string  UserName         { get; set; } = string.Empty;
+    public string  FullName         { get; set; } = string.Empty;
+    public string? Bio              { get; set; }
+    public string? AvatarUrl        { get; set; }
+    public string? CoverUrl         { get; set; }
+    public DateTime CreatedAt       { get; set; }
+    public int     PostCount        { get; set; }
+    public int     FriendCount      { get; set; }
+    public string  FriendshipStatus { get; set; } = "none"; // none | pending_sent | pending_received | accepted
+    public int?    FriendshipId     { get; set; }
+}
+
+public class UpdateProfileDTO
+{
+    [MaxLength(100)] public string? FullName { get; set; }
+    [MaxLength(300)] public string? Bio      { get; set; }
     public string? AvatarUrl { get; set; }
-    public string? CoverUrl { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public int PostCount { get; set; }
-    public int FriendCount { get; set; }
-    public string FriendshipStatus { get; set; } = "none"; // none, pending, accepted
+    public string? CoverUrl  { get; set; }
 }
 
-public class UpdateProfileDto
+// ════════════════════════════════════════════════════════════
+// POST DTO
+// ════════════════════════════════════════════════════════════
+public class CreatePostDTO
 {
-    [MaxLength(100)]
-    public string? FullName { get; set; }
-
-    [MaxLength(300)]
-    public string? Bio { get; set; }
+    [Required, MinLength(1), MaxLength(2000)]
+    public string       Content    { get; set; } = string.Empty;
+    public string?      ImageUrl   { get; set; }
+    [MaxLength(20)] public string Visibility { get; set; } = "public";
+    public List<string> Hashtags   { get; set; } = new();
 }
 
-// ─── POSTS ──────────────────────────────────────────────
-public class CreatePostDto
+public class UpdatePostDTO
 {
     [Required, MinLength(1), MaxLength(2000)]
     public string Content { get; set; } = string.Empty;
-
-    public string? ImageUrl { get; set; }
-    public List<string> Hashtags { get; set; } = new();
 }
 
-public class UpdatePostDto
+public class PostResponseDTO
 {
-    [Required, MinLength(1), MaxLength(2000)]
-    public string Content { get; set; } = string.Empty;
+    public int           Id                    { get; set; }
+    public string        Content               { get; set; } = string.Empty;
+    public string?       ImageUrl              { get; set; }
+    public string        Visibility            { get; set; } = "public";
+    public DateTime      CreatedAt             { get; set; }
+    public DateTime?     UpdatedAt             { get; set; }
+    public UserSummaryDTO Author               { get; set; } = null!;
+    public int           LikeCount             { get; set; }
+    public int           CommentCount          { get; set; }
+    public bool          IsLikedByCurrentUser  { get; set; }
+    public List<string>  Hashtags              { get; set; } = new();
 }
 
-public class PostResponseDto
-{
-    public int Id { get; set; }
-    public string Content { get; set; } = string.Empty;
-    public string? ImageUrl { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
-    public UserSummaryDto Author { get; set; } = null!;
-    public int LikeCount { get; set; }
-    public int CommentCount { get; set; }
-    public bool IsLikedByCurrentUser { get; set; }
-    public List<string> Hashtags { get; set; } = new();
-}
-
-public class UserSummaryDto
-{
-    public string Id { get; set; } = string.Empty;
-    public string UserName { get; set; } = string.Empty;
-    public string FullName { get; set; } = string.Empty;
-    public string? AvatarUrl { get; set; }
-}
-
-// ─── COMMENTS ───────────────────────────────────────────
-public class CreateCommentDto
+// ════════════════════════════════════════════════════════════
+// COMMENT DTO
+// ════════════════════════════════════════════════════════════
+public class CreateCommentDTO
 {
     [Required, MinLength(1), MaxLength(1000)]
     public string Content { get; set; } = string.Empty;
 }
 
-public class CommentResponseDto
+public class UpdateCommentDTO
 {
-    public int Id { get; set; }
+    [Required, MinLength(1), MaxLength(1000)]
     public string Content { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public UserSummaryDto Author { get; set; } = null!;
 }
 
-// ─── FRIENDS ────────────────────────────────────────────
-public class FriendRequestDto
+public class CommentResponseDTO
 {
-    [Required]
-    public string ReceiverId { get; set; } = string.Empty;
+    public int            Id        { get; set; }
+    public string         Content   { get; set; } = string.Empty;
+    public DateTime       CreatedAt { get; set; }
+    public UserSummaryDTO Author    { get; set; } = null!;
 }
 
-public class FriendshipResponseDto
+// ════════════════════════════════════════════════════════════
+// FRIEND DTO
+// ════════════════════════════════════════════════════════════
+public class SendFriendRequestDTO
 {
-    public int Id { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public UserSummaryDto OtherUser { get; set; } = null!;
+    [Required] public string ReceiverId { get; set; } = string.Empty;
 }
 
-// ─── STORIES ────────────────────────────────────────────
-public class CreateStoryDto
+public class FriendshipResponseDTO
 {
-    public string? ImageUrl { get; set; }
-
-    [MaxLength(300)]
-    public string? Caption { get; set; }
+    public int            Id        { get; set; }
+    public string         Status    { get; set; } = string.Empty;
+    public DateTime       CreatedAt { get; set; }
+    public UserSummaryDTO OtherUser { get; set; } = null!;
 }
 
-public class StoryResponseDto
+// ════════════════════════════════════════════════════════════
+// STORY DTO
+// ════════════════════════════════════════════════════════════
+public class CreateStoryDTO
 {
-    public int Id { get; set; }
-    public string? ImageUrl { get; set; }
-    public string? Caption { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public UserSummaryDto Author { get; set; } = null!;
+    public string?                  ImageUrl   { get; set; }
+    [MaxLength(300)] public string? Caption    { get; set; }
+    [MaxLength(20)] public string   Visibility { get; set; } = "public";
 }
 
-// ─── NOTIFICATIONS ──────────────────────────────────────
-public class NotificationResponseDto
+public class StoryResponseDTO
 {
-    public int Id { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty;
-    public bool IsRead { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public int? RelatedPostId { get; set; }
-    public UserSummaryDto? Actor { get; set; }
+    public int            Id         { get; set; }
+    public string?        ImageUrl   { get; set; }
+    public string?        Caption    { get; set; }
+    public string         Visibility { get; set; } = "public";
+    public DateTime       CreatedAt  { get; set; }
+    public DateTime       ExpiresAt  { get; set; }
+    public int            ViewCount  { get; set; }
+    public UserSummaryDTO Author     { get; set; } = null!;
 }
 
-// ─── REPORTS ────────────────────────────────────────────
-public class CreateReportDto
+// ════════════════════════════════════════════════════════════
+// NOTIFICATION DTO
+// ════════════════════════════════════════════════════════════
+public class NotificationResponseDTO
 {
-    [Required, MaxLength(500)]
-    public string Reason { get; set; } = string.Empty;
+    public int       Id            { get; set; }
+    public string    Message       { get; set; } = string.Empty;
+    public string    Type          { get; set; } = string.Empty;
+    public bool      IsRead        { get; set; }
+    public DateTime  CreatedAt     { get; set; }
+    public int?      RelatedPostId { get; set; }
 }
 
-// ─── PAGINATION ─────────────────────────────────────────
-public class PagedResultDto<T>
+// ════════════════════════════════════════════════════════════
+// REPORT DTO
+// ════════════════════════════════════════════════════════════
+public class CreateReportDTO
 {
-    public List<T> Items { get; set; } = new();
-    public int TotalCount { get; set; }
-    public int Page { get; set; }
-    public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
-    public bool HasNextPage => Page < TotalPages;
-    public bool HasPreviousPage => Page > 1;
-}
-
-// ─── API RESPONSE WRAPPER ───────────────────────────────
-public class ApiResponse<T>
-{
-    public bool Success { get; set; }
-    public T? Data { get; set; }
-    public string? Message { get; set; }
-    public List<string> Errors { get; set; } = new();
-
-    public static ApiResponse<T> Ok(T data, string? message = null) =>
-        new() { Success = true, Data = data, Message = message };
-
-    public static ApiResponse<T> Fail(string error) =>
-        new() { Success = false, Errors = new List<string> { error } };
-
-    public static ApiResponse<T> Fail(List<string> errors) =>
-        new() { Success = false, Errors = errors };
-}
-
-// ─── HASHTAGS ───────────────────────────────────────────
-public class HashtagTrendDto
-{
-    public string Name { get; set; } = string.Empty;
-    public int PostCount { get; set; }
+    [Required, MaxLength(500)] public string Reason { get; set; } = string.Empty;
 }

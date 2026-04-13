@@ -1,400 +1,531 @@
+using System.Security.Claims;
 using InteractHub.API.DTOs;
-using InteractHub.API.Services.Interfaces;
+using InteractHub.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using InteractHub.API.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
 
 namespace InteractHub.API.Controllers;
 
-// ─── AUTH CONTROLLER ─────────────────────────────────────────────────────────
+// Helper để lấy userId từ JWT claims
+public class BaseController : ControllerBase
+{
+    protected string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    protected bool   IsAdmin       => User.IsInRole("Admin");
+}
+
+// ════════════════════════════════════════════════════════════
+// AUTH CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public class AuthController : BaseController
 {
-    private readonly IAuthService _auth;
-    public AuthController(IAuthService auth) => _auth = auth;
+    private readonly AuthService _authService;
+    public AuthController(AuthService authService) => _authService = authService;
 
-    /// <summary>Register a new user account</summary>
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    public async Task<IActionResult> Register([FromBody] RegisterDTO dto)
     {
-        var result = await _auth.RegisterAsync(dto);
+        var result = await _authService.RegisterAsync(dto);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Login and receive JWT token</summary>
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginDto dto)
+    public async Task<IActionResult> Login([FromBody] LoginDTO dto)
     {
-        var result = await _auth.LoginAsync(dto);
+        var result = await _authService.LoginAsync(dto);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
-    /// <summary>Get current authenticated user info</summary>
-    [HttpGet("me")]
     [Authorize]
+    [HttpGet("me")]
     public IActionResult Me()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var userName = User.FindFirstValue(ClaimTypes.Name)!;
-        var fullName = User.FindFirstValue("fullName")!;
-        return Ok(ApiResponse<object>.Ok(new { userId, userName, fullName }));
+        return Ok(new { userId = CurrentUserId, userName = User.Identity?.Name });
     }
 }
 
-// ─── POSTS CONTROLLER ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// POST CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/posts")]
 [Authorize]
-public class PostsController : ControllerBase
+public class PostController : BaseController
 {
-    private readonly IPostsService _posts;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly PostService _postService;
+    public PostController(PostService postService) => _postService = postService;
 
-    public PostsController(IPostsService posts) => _posts = posts;
-
-    /// <summary>Get paginated news feed for current user</summary>
+    // GET /api/posts/feed?page=1&pageSize=10
     [HttpGet("feed")]
     public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        => Ok(await _posts.GetFeedAsync(UserId, page, pageSize));
+        => Ok(await _postService.GetFeedAsync(CurrentUserId, page, pageSize));
 
-    /// <summary>Search posts by content or hashtag</summary>
-    [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        => Ok(await _posts.SearchAsync(q, UserId, page, pageSize));
-
-    /// <summary>Get a single post by id</summary>
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
-    {
-        var result = await _posts.GetByIdAsync(id, UserId);
-        return result.Success ? Ok(result) : NotFound(result);
-    }
-
-    /// <summary>Get all posts by a specific user</summary>
+    // GET /api/posts/user/{userId}
     [HttpGet("user/{userId}")]
-    public async Task<IActionResult> GetUserPosts(string userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        => Ok(await _posts.GetUserPostsAsync(userId, UserId, page, pageSize));
+    public async Task<IActionResult> GetByUser(string userId, [FromQuery] int page = 1)
+        => Ok(await _postService.GetByUserAsync(userId, CurrentUserId, page, 10));
 
-    /// <summary>Create a new post</summary>
+    // GET /api/posts/search?keyword=abc
+    [HttpGet("search")]
+    public async Task<IActionResult> Search([FromQuery] string keyword, [FromQuery] int page = 1)
+        => Ok(await _postService.SearchAsync(keyword, CurrentUserId, page, 10));
+
+    // GET /api/posts/hashtag/{tag}
+    [HttpGet("hashtag/{tag}")]
+    public async Task<IActionResult> GetByHashtag(string tag, [FromQuery] int page = 1)
+        => Ok(await _postService.GetByHashtagAsync(tag, CurrentUserId, page, 10));
+
+    // POST /api/posts
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreatePostDto dto)
+    public async Task<IActionResult> Create([FromBody] CreatePostDTO dto)
     {
-        var result = await _posts.CreateAsync(UserId, dto);
-        return result.Success ? CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result) : BadRequest(result);
-    }
-
-    /// <summary>Update own post</summary>
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdatePostDto dto)
-    {
-        var result = await _posts.UpdateAsync(id, UserId, dto);
+        var result = await _postService.CreateAsync(CurrentUserId, dto);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Delete own post</summary>
+    // PUT /api/posts/{id}
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdatePostDTO dto)
+    {
+        var result = await _postService.UpdateAsync(id, CurrentUserId, dto);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    // DELETE /api/posts/{id}
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var result = await _posts.DeleteAsync(id, UserId);
+        var result = await _postService.DeleteAsync(id, CurrentUserId, IsAdmin);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Toggle like on a post</summary>
+    // POST /api/posts/{id}/like
     [HttpPost("{id:int}/like")]
     public async Task<IActionResult> ToggleLike(int id)
     {
-        var result = await _posts.ToggleLikeAsync(id, UserId);
+        var result = await _postService.ToggleLikeAsync(id, CurrentUserId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }
 
-// ─── COMMENTS CONTROLLER ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// COMMENT CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/posts/{postId:int}/comments")]
 [Authorize]
-public class CommentsController : ControllerBase
+public class CommentController : BaseController
 {
-    private readonly ICommentsService _comments;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly CommentService _commentService;
+    public CommentController(CommentService commentService) => _commentService = commentService;
 
-    public CommentsController(ICommentsService comments) => _comments = comments;
-
-    /// <summary>Get all comments for a post</summary>
+    // GET /api/posts/{postId}/comments
     [HttpGet]
-    public async Task<IActionResult> GetByPost(int postId)
-        => Ok(ApiResponse<List<CommentResponseDto>>.Ok(await _comments.GetByPostAsync(postId)));
+    public async Task<IActionResult> GetAll(int postId)
+        => Ok(await _commentService.GetByPostAsync(postId));
 
-    /// <summary>Add a comment to a post</summary>
+    // POST /api/posts/{postId}/comments
     [HttpPost]
-    public async Task<IActionResult> Create(int postId, [FromBody] CreateCommentDto dto)
+    public async Task<IActionResult> Create(int postId, [FromBody] CreateCommentDTO dto)
     {
-        var result = await _comments.CreateAsync(postId, UserId, dto);
+        var result = await _commentService.CreateAsync(postId, CurrentUserId, dto);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Delete own comment</summary>
+    // PUT /api/posts/{postId}/comments/{commentId}
+    [HttpPut("{commentId:int}")]
+    public async Task<IActionResult> Update(int postId, int commentId, [FromBody] UpdateCommentDTO dto)
+    {
+        var result = await _commentService.UpdateAsync(commentId, CurrentUserId, dto);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    // DELETE /api/posts/{postId}/comments/{commentId}
     [HttpDelete("{commentId:int}")]
     public async Task<IActionResult> Delete(int postId, int commentId)
     {
-        var result = await _comments.DeleteAsync(commentId, UserId);
+        var result = await _commentService.DeleteAsync(commentId, CurrentUserId, IsAdmin);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }
 
-// ─── FRIENDS CONTROLLER ──────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// FRIEND CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/friends")]
 [Authorize]
-public class FriendsController : ControllerBase
+public class FriendController : BaseController
 {
-    private readonly IFriendsService _friends;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly FriendService _friendService;
+    public FriendController(FriendService friendService) => _friendService = friendService;
 
-    public FriendsController(IFriendsService friends) => _friends = friends;
-
-    /// <summary>Get accepted friends list</summary>
+    // GET /api/friends  – danh sách bạn bè
     [HttpGet]
     public async Task<IActionResult> GetFriends()
-        => Ok(ApiResponse<List<FriendshipResponseDto>>.Ok(await _friends.GetFriendsAsync(UserId)));
+        => Ok(await _friendService.GetFriendsAsync(CurrentUserId));
 
-    /// <summary>Get pending incoming friend requests</summary>
+    // GET /api/friends/requests  – lời mời đang chờ
     [HttpGet("requests")]
-    public async Task<IActionResult> GetPendingRequests()
-        => Ok(ApiResponse<List<FriendshipResponseDto>>.Ok(await _friends.GetPendingRequestsAsync(UserId)));
+    public async Task<IActionResult> GetPending()
+        => Ok(await _friendService.GetPendingAsync(CurrentUserId));
 
-    /// <summary>Send a friend request</summary>
+    // POST /api/friends/request
     [HttpPost("request")]
-    public async Task<IActionResult> SendRequest([FromBody] FriendRequestDto dto)
+    public async Task<IActionResult> SendRequest([FromBody] SendFriendRequestDTO dto)
     {
-        var result = await _friends.SendRequestAsync(UserId, dto.ReceiverId);
+        var result = await _friendService.SendRequestAsync(CurrentUserId, dto.ReceiverId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Accept or reject a friend request</summary>
+    // PUT /api/friends/request/{id}?accept=true
     [HttpPut("request/{id:int}")]
-    public async Task<IActionResult> RespondToRequest(int id, [FromQuery] bool accept)
+    public async Task<IActionResult> Respond(int id, [FromQuery] bool accept)
     {
-        var result = await _friends.RespondToRequestAsync(id, UserId, accept);
+        var result = await _friendService.RespondAsync(id, CurrentUserId, accept);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Remove a friend</summary>
+    // DELETE /api/friends/{id}
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> RemoveFriend(int id)
+    public async Task<IActionResult> Remove(int id)
     {
-        var result = await _friends.RemoveFriendAsync(id, UserId);
+        var result = await _friendService.RemoveAsync(id, CurrentUserId);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    // DELETE /api/friends/with/{userId}  – hủy kết bạn / hủy lời mời bằng userId
+    [HttpDelete("with/{userId}")]
+    public async Task<IActionResult> RemoveByUser(string userId)
+    {
+        var result = await _friendService.RemoveByUserIdAsync(CurrentUserId, userId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }
 
-// ─── STORIES CONTROLLER ──────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// STORY CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/stories")]
 [Authorize]
-public class StoriesController : ControllerBase
+public class StoryController : BaseController
 {
-    private readonly IStoriesService _stories;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly StoryService _storyService;
+    public StoryController(StoryService storyService) => _storyService = storyService;
 
-    public StoriesController(IStoriesService stories) => _stories = stories;
-
-    /// <summary>Get stories from friends (active, not expired)</summary>
+    // GET /api/stories
     [HttpGet]
     public async Task<IActionResult> GetFeed()
-        => Ok(ApiResponse<List<StoryResponseDto>>.Ok(await _stories.GetFeedAsync(UserId)));
+        => Ok(await _storyService.GetFeedAsync(CurrentUserId));
 
-    /// <summary>Create a new story</summary>
+    // POST /api/stories
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateStoryDto dto)
+    public async Task<IActionResult> Create([FromBody] CreateStoryDTO dto)
     {
-        var result = await _stories.CreateAsync(UserId, dto);
+        var result = await _storyService.CreateAsync(CurrentUserId, dto);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Delete own story</summary>
+    // POST /api/stories/{id}/view  – ghi nhận lượt xem
+    [HttpPost("{id:int}/view")]
+    public async Task<IActionResult> RecordView(int id)
+    {
+        await _storyService.RecordViewAsync(id, CurrentUserId);
+        return Ok();
+    }
+
+    // DELETE /api/stories/{id}
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var result = await _stories.DeleteAsync(id, UserId);
+        var result = await _storyService.DeleteAsync(id, CurrentUserId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }
 
-// ─── NOTIFICATIONS CONTROLLER ────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// NOTIFICATION CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/notifications")]
 [Authorize]
-public class NotificationsController : ControllerBase
+public class NotificationController : BaseController
 {
-    private readonly INotificationsService _notifications;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly NotificationService _notifService;
+    public NotificationController(NotificationService notifService) => _notifService = notifService;
 
-    public NotificationsController(INotificationsService notifications) => _notifications = notifications;
-
-    /// <summary>Get all notifications for current user</summary>
+    // GET /api/notifications
     [HttpGet]
     public async Task<IActionResult> GetAll()
-        => Ok(ApiResponse<List<NotificationResponseDto>>.Ok(await _notifications.GetUserNotificationsAsync(UserId)));
+        => Ok(await _notifService.GetAllAsync(CurrentUserId));
 
-    /// <summary>Mark a notification as read</summary>
+    // PUT /api/notifications/{id}/read
     [HttpPut("{id:int}/read")]
-    public async Task<IActionResult> MarkAsRead(int id)
+    public async Task<IActionResult> MarkRead(int id)
     {
-        var result = await _notifications.MarkAsReadAsync(id, UserId);
+        var result = await _notifService.MarkReadAsync(id, CurrentUserId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Mark all notifications as read</summary>
+    // PUT /api/notifications/read-all
     [HttpPut("read-all")]
-    public async Task<IActionResult> MarkAllAsRead()
+    public async Task<IActionResult> MarkAllRead()
     {
-        await _notifications.MarkAllAsReadAsync(UserId);
-        return Ok(ApiResponse<bool>.Ok(true));
+        await _notifService.MarkAllReadAsync(CurrentUserId);
+        return Ok(new { success = true });
     }
 }
 
-// ─── USERS CONTROLLER ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// USER CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/users")]
 [Authorize]
-public class UsersController : ControllerBase
+public class UserController : BaseController
 {
-    private readonly Microsoft.AspNetCore.Identity.UserManager<Models.AppUser> _userManager;
-    private readonly AppDbContext _db;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly UserService _userService;
+    public UserController(UserService userService) => _userService = userService;
 
-    public UsersController(
-        Microsoft.AspNetCore.Identity.UserManager<Models.AppUser> userManager,
-        AppDbContext db)
-    {
-        _userManager = userManager;
-        _db = db;
-    }
-
-    /// <summary>Get a user's public profile</summary>
+    // GET /api/users/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetProfile(string id)
     {
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound(ApiResponse<UserProfileDto>.Fail("User not found."));
-
-        var postCount = await _db.Posts.CountAsync(p => p.UserId == id && !p.IsDeleted);
-        var friendCount = await _db.Friendships.CountAsync(f =>
-            (f.SenderId == id || f.ReceiverId == id) && f.Status == "accepted");
-
-        var friendship = await _db.Friendships.FirstOrDefaultAsync(f =>
-            (f.SenderId == UserId && f.ReceiverId == id) ||
-            (f.SenderId == id && f.ReceiverId == UserId));
-
-        return Ok(ApiResponse<UserProfileDto>.Ok(new UserProfileDto
-        {
-            Id = user.Id,
-            UserName = user.UserName!,
-            FullName = user.FullName,
-            Bio = user.Bio,
-            AvatarUrl = user.AvatarUrl,
-            CoverUrl = user.CoverUrl,
-            CreatedAt = user.CreatedAt,
-            PostCount = postCount,
-            FriendCount = friendCount,
-            FriendshipStatus = friendship?.Status ?? "none"
-        }));
+        var result = await _userService.GetProfileAsync(id, CurrentUserId);
+        return result.Success ? Ok(result) : NotFound(result);
     }
 
-    /// <summary>Update own profile</summary>
+    // PUT /api/users/me
     [HttpPut("me")]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDTO dto)
     {
-        var user = await _userManager.FindByIdAsync(UserId);
-        if (user == null) return NotFound();
-
-        if (dto.FullName != null) user.FullName = dto.FullName;
-        if (dto.Bio != null) user.Bio = dto.Bio;
-
-        var result = await _userManager.UpdateAsync(user);
-        return result.Succeeded ? Ok(ApiResponse<bool>.Ok(true)) : BadRequest(result.Errors);
+        var result = await _userService.UpdateProfileAsync(CurrentUserId, dto);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>Search users by username or full name</summary>
+    // GET /api/users/search?keyword=abc
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string q)
-    {
-        var users = await _db.Users
-            .Where(u => u.UserName!.Contains(q) || u.FullName.Contains(q))
-            .Take(20)
-            .Select(u => new UserSummaryDto
-            {
-                Id = u.Id,
-                UserName = u.UserName!,
-                FullName = u.FullName,
-                AvatarUrl = u.AvatarUrl
-            })
-            .ToListAsync();
+    public async Task<IActionResult> Search([FromQuery] string keyword)
+        => Ok(await _userService.SearchAsync(keyword));
+}
 
-        return Ok(ApiResponse<List<UserSummaryDto>>.Ok(users));
+// ════════════════════════════════════════════════════════════
+// UPLOAD CONTROLLER
+// ════════════════════════════════════════════════════════════
+[ApiController]
+[Route("api/upload")]
+[Authorize]
+public class UploadController : BaseController
+{
+    private static readonly string[] AllowedImages = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+    private static readonly string[] AllowedVideos = [".mp4", ".webm", ".mov", ".avi"];
+
+    // POST /api/upload
+    [HttpPost]
+    public async Task<IActionResult> Upload(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { success = false, message = "Không có file." });
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedImages.Contains(ext) && !AllowedVideos.Contains(ext))
+            return BadRequest(new { success = false, message = "Định dạng không được hỗ trợ (jpg/png/gif/mp4/webm/mov)." });
+
+        if (file.Length > 50 * 1024 * 1024) // 50 MB
+            return BadRequest(new { success = false, message = "File quá lớn (tối đa 50MB)." });
+
+        var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+        Directory.CreateDirectory(uploadDir);
+
+        var fileName = $"{Guid.NewGuid()}{ext}";
+        var filePath = Path.Combine(uploadDir, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+            await file.CopyToAsync(stream);
+
+        var url = $"{Request.Scheme}://{Request.Host}/uploads/{fileName}";
+        return Ok(new { success = true, url });
     }
 }
 
-// ─── ADMIN REPORTS CONTROLLER ────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// ADMIN CONTROLLER
+// ════════════════════════════════════════════════════════════
 [ApiController]
-[Route("api/reports")]
-[Authorize]
-public class ReportsController : ControllerBase
+[Route("api/admin")]
+[Authorize(Roles = "Admin")]
+public class AdminController : BaseController
 {
-    private readonly AppDbContext _db;
-    private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private readonly InteractHub.API.Data.AppDbContext _db;
+    private readonly Microsoft.AspNetCore.Identity.UserManager<InteractHub.API.Models.AppUser> _userManager;
 
-    public ReportsController(AppDbContext db) => _db = db;
-
-    /// <summary>Report a post</summary>
-    [HttpPost("{postId:int}")]
-    public async Task<IActionResult> ReportPost(int postId, [FromBody] CreateReportDto dto)
+    public AdminController(
+        InteractHub.API.Data.AppDbContext db,
+        Microsoft.AspNetCore.Identity.UserManager<InteractHub.API.Models.AppUser> userManager)
     {
-        var post = await _db.Posts.FindAsync(postId);
-        if (post == null) return NotFound(ApiResponse<bool>.Fail("Post not found."));
-
-        _db.PostReports.Add(new Models.PostReport { PostId = postId, UserId = UserId, Reason = dto.Reason });
-        await _db.SaveChangesAsync();
-
-        return Ok(ApiResponse<bool>.Ok(true, "Report submitted."));
+        _db          = db;
+        _userManager = userManager;
     }
 
-    /// <summary>Admin: Get all pending reports</summary>
-    [HttpGet]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetReports()
+    // GET /api/admin/stats
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetStats()
     {
-        var reports = await _db.PostReports
-            .Include(r => r.User)
-            .Include(r => r.Post)
-            .Where(r => r.Status == "pending")
-            .Select(r => new
+        var totalUsers   = await _db.Users.CountAsync();
+        var totalPosts   = await _db.Posts.CountAsync(p => !p.IsDeleted);
+        var totalReports = await _db.PostReports.CountAsync(r => r.Status == "pending");
+        var totalStories = await _db.Stories.CountAsync(s => s.ExpiresAt > DateTime.UtcNow);
+        return Ok(new { totalUsers, totalPosts, totalReports, totalStories });
+    }
+
+    // GET /api/admin/users?page=1&keyword=
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] string keyword = "")
+    {
+        var query = _db.Users.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(keyword))
+            query = query.Where(u => u.UserName!.Contains(keyword) || u.FullName.Contains(keyword) || u.Email!.Contains(keyword));
+
+        var total = await query.CountAsync();
+        var users = await query.OrderByDescending(u => u.CreatedAt)
+            .Skip((page - 1) * 20).Take(20)
+            .Select(u => new { u.Id, u.UserName, u.FullName, u.Email, u.AvatarUrl, u.IsActive, u.CreatedAt })
+            .ToListAsync();
+
+        return Ok(new { items = users, totalCount = total, page, pageSize = 20 });
+    }
+
+    // PUT /api/admin/users/{id}/toggle-active
+    [HttpPut("users/{id}/toggle-active")]
+    public async Task<IActionResult> ToggleActive(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound();
+        user.IsActive = !user.IsActive;
+        await _userManager.UpdateAsync(user);
+        return Ok(new { success = true, isActive = user.IsActive });
+    }
+
+    // GET /api/admin/posts?page=1
+    [HttpGet("posts")]
+    public async Task<IActionResult> GetPosts([FromQuery] int page = 1, [FromQuery] string keyword = "")
+    {
+        var query = _db.Posts
+            .Include(p => p.User)
+            .Include(p => p.PostReports)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+            query = query.Where(p => p.Content.Contains(keyword) || p.User.FullName.Contains(keyword));
+
+        var total = await query.CountAsync();
+        var posts = await query.OrderByDescending(p => p.CreatedAt)
+            .Skip((page - 1) * 20).Take(20)
+            .Select(p => new
             {
-                r.Id,
-                r.Reason,
-                r.Status,
-                r.CreatedAt,
-                ReportedBy = r.User.UserName,
-                PostId = r.PostId
+                p.Id, p.Content, p.ImageUrl, p.Visibility, p.IsDeleted, p.CreatedAt,
+                Author = new { p.User.Id, p.User.FullName, p.User.UserName, p.User.AvatarUrl },
+                ReportCount = p.PostReports.Count(r => r.Status == "pending"),
             })
             .ToListAsync();
 
-        return Ok(ApiResponse<object>.Ok(reports));
+        return Ok(new { items = posts, totalCount = total, page, pageSize = 20 });
     }
 
-    /// <summary>Admin: Update report status</summary>
-    [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    // DELETE /api/admin/posts/{id}  – xóa hẳn (hard delete)
+    [HttpDelete("posts/{id:int}")]
+    public async Task<IActionResult> DeletePost(int id)
+    {
+        var post = await _db.Posts.FindAsync(id);
+        if (post == null) return NotFound();
+        post.IsDeleted = true;
+        await _db.SaveChangesAsync();
+        return Ok(new { success = true });
+    }
+
+    // GET /api/admin/reports
+    [HttpGet("reports")]
+    public async Task<IActionResult> GetReports([FromQuery] string status = "pending")
+    {
+        var reports = await _db.PostReports
+            .Include(r => r.User)
+            .Include(r => r.Post).ThenInclude(p => p.User)
+            .Where(r => status == "all" || r.Status == status)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(100)
+            .Select(r => new
+            {
+                r.Id, r.Reason, r.Status, r.CreatedAt,
+                Reporter = new { r.User.FullName, r.User.UserName },
+                Post = new { r.Post.Id, r.Post.Content, r.Post.IsDeleted, Author = new { r.Post.User.FullName } },
+            })
+            .ToListAsync();
+        return Ok(reports);
+    }
+
+    // PUT /api/admin/reports/{id}
+    [HttpPut("reports/{id:int}")]
     public async Task<IActionResult> UpdateReport(int id, [FromQuery] string status)
     {
         var report = await _db.PostReports.FindAsync(id);
         if (report == null) return NotFound();
         report.Status = status;
         await _db.SaveChangesAsync();
-        return Ok(ApiResponse<bool>.Ok(true));
+        return Ok(new { success = true });
+    }
+}
+
+// ════════════════════════════════════════════════════════════
+// REPORT CONTROLLER (Admin moderation)
+// ════════════════════════════════════════════════════════════
+[ApiController]
+[Route("api/reports")]
+[Authorize]
+public class ReportController : BaseController
+{
+    private readonly InteractHub.API.Data.AppDbContext _db;
+    public ReportController(InteractHub.API.Data.AppDbContext db) => _db = db;
+
+    // POST /api/reports/{postId}  – user báo cáo bài đăng
+    [HttpPost("{postId:int}")]
+    public async Task<IActionResult> Report(int postId, [FromBody] CreateReportDTO dto)
+    {
+        var post = await _db.Posts.FindAsync(postId);
+        if (post == null) return NotFound(new { message = "Bài đăng không tồn tại." });
+
+        _db.PostReports.Add(new InteractHub.API.Models.PostReport
+        {
+            PostId = postId,
+            UserId = CurrentUserId,
+            Reason = dto.Reason,
+        });
+        await _db.SaveChangesAsync();
+        return Ok(new { success = true, message = "Đã gửi báo cáo." });
+    }
+
+    // GET /api/reports  – admin xem danh sách báo cáo
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll()
+    {
+        var reports = await _db.PostReports
+            .Select(r => new { r.Id, r.Reason, r.Status, r.CreatedAt, r.PostId, r.UserId })
+            .ToListAsync();
+        return Ok(reports);
+    }
+
+    // PUT /api/reports/{id}?status=reviewed  – admin cập nhật trạng thái
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateStatus(int id, [FromQuery] string status)
+    {
+        var report = await _db.PostReports.FindAsync(id);
+        if (report == null) return NotFound();
+        report.Status = status;
+        await _db.SaveChangesAsync();
+        return Ok(new { success = true });
     }
 }

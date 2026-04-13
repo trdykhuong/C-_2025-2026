@@ -8,100 +8,75 @@ public class AppDbContext : IdentityDbContext<AppUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<Post> Posts => Set<Post>();
-    public DbSet<Comment> Comments => Set<Comment>();
-    public DbSet<Like> Likes => Set<Like>();
-    public DbSet<Hashtag> Hashtags => Set<Hashtag>();
-    public DbSet<PostHashtag> PostHashtags => Set<PostHashtag>();
-    public DbSet<Story> Stories => Set<Story>();
+    public DbSet<Post>         Posts         => Set<Post>();
+    public DbSet<Comment>      Comments      => Set<Comment>();
+    public DbSet<Like>         Likes         => Set<Like>();
+    public DbSet<Hashtag>      Hashtags      => Set<Hashtag>();
+    public DbSet<PostHashtag>  PostHashtags  => Set<PostHashtag>();
+    public DbSet<Story>        Stories       => Set<Story>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Friendship> Friendships => Set<Friendship>();
-    public DbSet<PostReport> PostReports => Set<PostReport>();
+    public DbSet<Friendship>   Friendships   => Set<Friendship>();
+    public DbSet<PostReport>   PostReports   => Set<PostReport>();
+    public DbSet<StoryView>    StoryViews    => Set<StoryView>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
-        // PostHashtag composite key
+        // PostHashtag – composite PK
         builder.Entity<PostHashtag>()
-            .HasKey(ph => new { ph.PostId, ph.HashtagId });
+            .HasKey(x => new { x.PostId, x.HashtagId });
 
-        // Like unique constraint (one like per user per post)
+        // Like – 1 user chỉ like 1 post 1 lần
         builder.Entity<Like>()
-            .HasIndex(l => new { l.UserId, l.PostId })
-            .IsUnique();
+            .HasIndex(x => new { x.UserId, x.PostId }).IsUnique();
 
-        // Friendship unique constraint
+        // Friendship – không trùng cặp
         builder.Entity<Friendship>()
-            .HasIndex(f => new { f.SenderId, f.ReceiverId })
-            .IsUnique();
+            .HasIndex(x => new { x.SenderId, x.ReceiverId }).IsUnique();
 
-        // Friendship -> Sender (no cascade delete to avoid multiple cascade paths)
+        // Friendship FK – dùng Restrict để tránh multiple cascade paths
         builder.Entity<Friendship>()
             .HasOne(f => f.Sender)
-            .WithMany(u => u.SentFriendRequests)
+            .WithMany()
             .HasForeignKey(f => f.SenderId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Friendship>()
             .HasOne(f => f.Receiver)
-            .WithMany(u => u.ReceivedFriendRequests)
+            .WithMany()
             .HasForeignKey(f => f.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Post -> User cascade
-        builder.Entity<Post>()
-            .HasOne(p => p.User)
-            .WithMany(u => u.Posts)
-            .HasForeignKey(p => p.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // Comment -> Post cascade
-        builder.Entity<Comment>()
-            .HasOne(c => c.Post)
-            .WithMany(p => p.Comments)
-            .HasForeignKey(c => c.PostId)
-            .OnDelete(DeleteBehavior.Cascade);
-
+        // Comment FK – Restrict để tránh multiple cascade
         builder.Entity<Comment>()
             .HasOne(c => c.User)
-            .WithMany(u => u.Comments)
+            .WithMany()
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Like -> Post cascade
-        builder.Entity<Like>()
-            .HasOne(l => l.Post)
-            .WithMany(p => p.Likes)
-            .HasForeignKey(l => l.PostId)
-            .OnDelete(DeleteBehavior.Cascade);
-
+        // Like FK – Restrict
         builder.Entity<Like>()
             .HasOne(l => l.User)
-            .WithMany(u => u.Likes)
+            .WithMany()
             .HasForeignKey(l => l.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Hashtag name unique
         builder.Entity<Hashtag>()
-            .HasIndex(h => h.Name)
-            .IsUnique();
+            .HasIndex(h => h.Name).IsUnique();
 
-        // Seed Roles
+        // Seed roles
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityRole>().HasData(
             new Microsoft.AspNetCore.Identity.IdentityRole
             {
-                Id = "role-admin-id",
-                Name = "Admin",
-                NormalizedName = "ADMIN",
-                ConcurrencyStamp = "1"
+                Id = "admin-role-id", Name = "Admin",
+                NormalizedName = "ADMIN", ConcurrencyStamp = "1"
             },
             new Microsoft.AspNetCore.Identity.IdentityRole
             {
-                Id = "role-user-id",
-                Name = "User",
-                NormalizedName = "USER",
-                ConcurrencyStamp = "2"
+                Id = "user-role-id", Name = "User",
+                NormalizedName = "USER", ConcurrencyStamp = "2"
             }
         );
     }
