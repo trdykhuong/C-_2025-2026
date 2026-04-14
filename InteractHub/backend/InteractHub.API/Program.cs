@@ -1,6 +1,8 @@
 using System.Text;
 using InteractHub.API.Data;
 using InteractHub.API.Models;
+using InteractHub.API.Repositories;
+using InteractHub.API.Repositories.Interfaces;
 using InteractHub.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -74,9 +76,17 @@ builder.Services.AddCors(opt =>
               .AllowAnyMethod()
               .AllowCredentials()));
 
-// ─── 5. SERVICES (Dependency Injection) ──────────────────────────────────────
+// ─── 5. REPOSITORIES ─────────────────────────────────────────────────────────
+builder.Services.AddScoped<IPostRepository,         PostRepository>();
+builder.Services.AddScoped<ICommentRepository,      CommentRepository>();
+builder.Services.AddScoped<IFriendRepository,       FriendRepository>();
+builder.Services.AddScoped<IStoryRepository,        StoryRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IUserRepository,         UserRepository>();
+
+// ─── 6. SERVICES (Dependency Injection) ──────────────────────────────────────
 builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<NotificationService>(); // NotificationService phải đăng ký trước vì PostService cần nó
+builder.Services.AddScoped<NotificationService>(); // đăng ký trước vì PostService/CommentService/FriendService cần
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<FriendService>();

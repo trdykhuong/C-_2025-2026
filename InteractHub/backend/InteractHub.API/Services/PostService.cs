@@ -1,75 +1,53 @@
-using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using InteractHub.API.Models;
-using Microsoft.EntityFrameworkCore;
+using InteractHub.API.Repositories.Interfaces;
 
 namespace InteractHub.API.Services;
 
 public class PostService
 {
-    private readonly AppDbContext       _db;
-    private readonly NotificationService _notifService;
+    private readonly IPostRepository      _repo;
+    private readonly NotificationService  _notifService;
 
-    public PostService(AppDbContext db, NotificationService notifService)
+    public PostService(IPostRepository repo, NotificationService notifService)
     {
-        _db           = db;
+        _repo         = repo;
         _notifService = notifService;
     }
 
-    // ── Lấy feed (bài đăng của bạn bè + bản thân) ───────────────────────────
-    public async Task<PagedResult<PostResponseDTO>> GetFeedAsync(string currentUserId, int page, int pageSize)
+    // ── Feed (bài đăng của bạn bè + bản thân) ───────────────────────────────
+    public async Task<PagedResult<PostResponseDTO>> GetFeedAsync(string userId, int page, int pageSize)
     {
-        // Lấy danh sách friend id
-        var friendIds = await _db.Friendships
-            .Where(f => (f.SenderId == currentUserId || f.ReceiverId == currentUserId)
-                        && f.Status == "accepted")
-            .Select(f => f.SenderId == currentUserId ? f.ReceiverId : f.SenderId)
-            .ToListAsync();
+        var friendIds = await _repo.GetFriendIdsAsync(userId);
+        friendIds.Add(userId);
 
-        friendIds.Add(currentUserId);
-
-        var query = _db.Posts
-            .Where(p => !p.IsDeleted && friendIds.Contains(p.UserId))
-            .Where(p => p.Visibility == "public"
-                     || p.Visibility == "friends"
-                     || (p.Visibility == "private" && p.UserId == currentUserId))
-            .OrderByDescending(p => p.CreatedAt);
-
-        return await ToPagedResultAsync(query, currentUserId, page, pageSize);
+        var (total, posts) = await _repo.GetFeedPagedAsync(friendIds, userId, page, pageSize);
+        return BuildPaged(posts, userId, total, page, pageSize);
     }
 
-    // ── Lấy bài đăng của 1 user cụ thể ─────────────────────────────────────
+    // ── Bài đăng của 1 user cụ thể ──────────────────────────────────────────
     public async Task<PagedResult<PostResponseDTO>> GetByUserAsync(string userId, string currentUserId, int page, int pageSize)
     {
-        var query = _db.Posts
-            .Where(p => !p.IsDeleted && p.UserId == userId)
-            .OrderByDescending(p => p.CreatedAt);
-
-        return await ToPagedResultAsync(query, currentUserId, page, pageSize);
+        var (total, posts) = await _repo.GetByUserPagedAsync(userId, page, pageSize);
+        return BuildPaged(posts, currentUserId, total, page, pageSize);
     }
 
     // ── Tìm kiếm bài đăng ───────────────────────────────────────────────────
     public async Task<PagedResult<PostResponseDTO>> SearchAsync(string keyword, string currentUserId, int page, int pageSize)
     {
-        var query = _db.Posts
-            .Where(p => !p.IsDeleted && p.Content.Contains(keyword))
-            .OrderByDescending(p => p.CreatedAt);
-
-        return await ToPagedResultAsync(query, currentUserId, page, pageSize);
+        var (total, posts) = await _repo.SearchPagedAsync(keyword, page, pageSize);
+        return BuildPaged(posts, currentUserId, total, page, pageSize);
     }
 
-    // ── Lấy bài đăng theo hashtag ────────────────────────────────────────────
+    // ── Bài đăng theo hashtag ────────────────────────────────────────────────
     public async Task<PagedResult<PostResponseDTO>> GetByHashtagAsync(string tag, string currentUserId, int page, int pageSize)
     {
         var normalizedTag = tag.ToLower().Trim().TrimStart('#');
-        var query = _db.Posts
-            .Where(p => !p.IsDeleted && p.PostHashtags.Any(ph => ph.Hashtag.Name == normalizedTag))
-            .OrderByDescending(p => p.CreatedAt);
-
-        return await ToPagedResultAsync(query, currentUserId, page, pageSize);
+        var (total, posts) = await _repo.GetByHashtagPagedAsync(normalizedTag, page, pageSize);
+        return BuildPaged(posts, currentUserId, total, page, pageSize);
     }
 
-    // ── Tạo bài đăng mới ────────────────────────────────────────────────────
+    // ── Tạo bài đăng ────────────────────────────────────────────────────────
     public async Task<ApiResult<PostResponseDTO>> CreateAsync(string userId, CreatePostDTO dto)
     {
         var post = new Post
@@ -80,21 +58,16 @@ public class PostService
             UserId     = userId,
         };
 
-        // Xử lý hashtag
         foreach (var tagName in dto.Hashtags.Distinct())
         {
             var name    = tagName.ToLower().Trim().TrimStart('#');
-            var hashtag = await _db.Hashtags.FirstOrDefaultAsync(h => h.Name == name)
-                          ?? new Hashtag { Name = name };
-
+            var hashtag = await _repo.FindHashtagByNameAsync(name) ?? new Hashtag { Name = name };
             post.PostHashtags.Add(new PostHashtag { Hashtag = hashtag });
         }
 
-        _db.Posts.Add(post);
-        await _db.SaveChangesAsync();
-
-        // Load navigation để map DTO
-        await _db.Entry(post).Reference(p => p.User).LoadAsync();
+        _repo.Add(post);
+        await _repo.SaveChangesAsync();
+        await _repo.LoadUserAsync(post);
 
         return ApiResult<PostResponseDTO>.Ok(MapToDTO(post, userId), "Đăng bài thành công!");
     }
@@ -102,15 +75,13 @@ public class PostService
     // ── Cập nhật bài đăng ───────────────────────────────────────────────────
     public async Task<ApiResult<PostResponseDTO>> UpdateAsync(int postId, string userId, UpdatePostDTO dto)
     {
-        var post = await _db.Posts.Include(p => p.User)
-                                  .FirstOrDefaultAsync(p => p.Id == postId && !p.IsDeleted);
-
-        if (post == null)  return ApiResult<PostResponseDTO>.Fail("Không tìm thấy bài đăng.");
-        if (post.UserId != userId) return ApiResult<PostResponseDTO>.Fail("Bạn không có quyền sửa bài này.");
+        var post = await _repo.FindActiveWithUserAsync(postId);
+        if (post == null)           return ApiResult<PostResponseDTO>.Fail("Không tìm thấy bài đăng.");
+        if (post.UserId != userId)  return ApiResult<PostResponseDTO>.Fail("Bạn không có quyền sửa bài này.");
 
         post.Content   = dto.Content;
         post.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await _repo.SaveChangesAsync();
 
         return ApiResult<PostResponseDTO>.Ok(MapToDTO(post, userId));
     }
@@ -118,66 +89,51 @@ public class PostService
     // ── Xóa bài đăng (soft delete) ──────────────────────────────────────────
     public async Task<ApiResult<bool>> DeleteAsync(int postId, string userId, bool isAdmin = false)
     {
-        var post = await _db.Posts.FindAsync(postId);
+        var post = await _repo.FindByIdAsync(postId);
         if (post == null) return ApiResult<bool>.Fail("Không tìm thấy bài đăng.");
 
         if (post.UserId != userId && !isAdmin)
             return ApiResult<bool>.Fail("Bạn không có quyền xóa bài này.");
 
         post.IsDeleted = true;
-        await _db.SaveChangesAsync();
+        await _repo.SaveChangesAsync();
         return ApiResult<bool>.Ok(true, "Đã xóa bài đăng.");
     }
 
     // ── Like / Unlike bài đăng ──────────────────────────────────────────────
     public async Task<ApiResult<bool>> ToggleLikeAsync(int postId, string userId)
     {
-        var post = await _db.Posts.FindAsync(postId);
+        var post = await _repo.FindByIdAsync(postId);
         if (post == null) return ApiResult<bool>.Fail("Không tìm thấy bài đăng.");
 
-        var existing = await _db.Likes.FirstOrDefaultAsync(l => l.PostId == postId && l.UserId == userId);
+        var existing = await _repo.FindLikeAsync(postId, userId);
         if (existing != null)
         {
-            _db.Likes.Remove(existing);
-            await _db.SaveChangesAsync();
+            _repo.RemoveLike(existing);
+            await _repo.SaveChangesAsync();
             return ApiResult<bool>.Ok(false, "Đã bỏ like.");
         }
 
-        _db.Likes.Add(new Like { PostId = postId, UserId = userId });
-        await _db.SaveChangesAsync();
+        _repo.AddLike(new Like { PostId = postId, UserId = userId });
+        await _repo.SaveChangesAsync();
 
-        // Gửi notification nếu không phải tự like bài của mình
         if (post.UserId != userId)
             await _notifService.CreateAsync(post.UserId, userId, "like", "đã thích bài viết của bạn.", postId);
 
         return ApiResult<bool>.Ok(true, "Đã like.");
     }
 
-    // ── Helper: chuyển query → PagedResult ──────────────────────────────────
-    private async Task<PagedResult<PostResponseDTO>> ToPagedResultAsync(
-        IQueryable<Post> query, string currentUserId, int page, int pageSize)
-    {
-        var total = await query.CountAsync();
-
-        var posts = await query
-            .Include(p => p.User)
-            .Include(p => p.Likes)
-            .Include(p => p.Comments.Where(c => !c.IsDeleted))
-            .Include(p => p.PostHashtags).ThenInclude(ph => ph.Hashtag)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return new PagedResult<PostResponseDTO>
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    private static PagedResult<PostResponseDTO> BuildPaged(
+        List<Post> posts, string currentUserId, int total, int page, int pageSize)
+        => new()
         {
             Items      = posts.Select(p => MapToDTO(p, currentUserId)).ToList(),
             TotalCount = total,
             Page       = page,
             PageSize   = pageSize,
         };
-    }
 
-    // ── Helper: map Post entity → PostResponseDTO ────────────────────────────
     private static PostResponseDTO MapToDTO(Post p, string currentUserId) => new()
     {
         Id                   = p.Id,
