@@ -1,9 +1,8 @@
-using InteractHub.API.Data;
+﻿using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using InteractHub.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace InteractHub.API.Controllers;

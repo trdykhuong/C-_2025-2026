@@ -1,4 +1,4 @@
-using InteractHub.API.Data;
+﻿using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using InteractHub.API.Models;
 using InteractHub.API.Services.Interfaces;
@@ -66,13 +66,8 @@ public class PostsService : IPostsService
 
         foreach (var tag in dto.Hashtags.Distinct())
         {
-            var hashtag = await _db.Hashtags.FirstOrDefaultAsync(h => h.Name == tag.ToLower());
-
-            if (hashtag == null)
-            {
-                hashtag = new Hashtag { Name = tag.ToLower() };
-                _db.Hashtags.Add(hashtag);
-            }
+            var hashtag = await _db.Hashtags.FirstOrDefaultAsync(h => h.Name == tag.ToLower())
+                          ?? new Hashtag { Name = tag.ToLower() };
 
             post.PostHashtags.Add(new PostHashtag { Hashtag = hashtag });
         }

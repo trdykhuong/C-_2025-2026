@@ -14,7 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ─── DATABASE ────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure(3)));
+
 // ─── IDENTITY ────────────────────────────────────────────────────────────────
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 {
@@ -129,33 +132,15 @@ builder.Services.AddControllers();
 // ─── BUILD ────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// Auto-migrate and seed roles on startup
+// Auto-migrate on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    try
-    {
-        // Apply migrations first
-        db.Database.Migrate();
-
-        // Only after migrations succeeded, ensure default roles exist
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        Task.Run(async () =>
-        {
-            var roles = new[] { "Admin", "User" };
-            foreach (var role in roles)
-            {
-                if (!await roleManager.RoleExistsAsync(role))
-                {
-                    await roleManager.CreateAsync(new IdentityRole(role));
-                }
-            }
-        }).GetAwaiter().GetResult();
-    }
+    try { db.Database.Migrate(); }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Migration or role seeding failed – continuing startup.");
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Migration failed – continuing startup.");
     }
 }
 

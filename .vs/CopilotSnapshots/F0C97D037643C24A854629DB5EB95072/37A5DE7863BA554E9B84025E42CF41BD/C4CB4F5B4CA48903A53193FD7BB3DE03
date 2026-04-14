@@ -1,4 +1,4 @@
-using InteractHub.API.Data;
+﻿using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,5 +26,15 @@ public class HashtagsService : IHashtagsService
             .OrderByDescending(h => h.PostCount)
             .Take(count)
             .ToListAsync();
+    }
+}
+
+// Add this DTO to DTOs file
+namespace InteractHub.API.DTOs
+{
+    public class HashtagTrendDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public int PostCount { get; set; }
     }
 }
