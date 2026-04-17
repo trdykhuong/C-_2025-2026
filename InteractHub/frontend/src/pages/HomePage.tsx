@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import {
   Image, Smile, Video, ThumbsUp, MessageCircle, Share2,
   MoreHorizontal, Globe, Lock, Users, Trash2, X, Send,
-  Plus, Pencil, Check, Copy, Eye, Upload,
+  Plus, Pencil, Check, Copy, Eye, Upload, Flag,
 } from 'lucide-react';
-import { postsApi, commentsApi, storiesApi, uploadApi } from '../services/api';
+import { postsApi, commentsApi, storiesApi, uploadApi, reportsApi } from '../services/api';
 import type { Post, Comment, Story } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
@@ -594,13 +594,29 @@ const PostCard: React.FC<{
   onUpdate: (id: number, content: string) => void;
   onToast: (msg: string) => void;
 }> = ({ post, currentUserId, onLike, onDelete, onUpdate, onToast }) => {
-  const [showComments, setShowComments] = useState(false);
-  const [showMenu, setShowMenu]         = useState(false);
-  const [editing, setEditing]           = useState(false);
-  const [editContent, setEditContent]   = useState(post.content);
-  const [saving, setSaving]             = useState(false);
+  const [showComments, setShowComments]   = useState(false);
+  const [showMenu, setShowMenu]           = useState(false);
+  const [editing, setEditing]             = useState(false);
+  const [editContent, setEditContent]     = useState(post.content);
+  const [saving, setSaving]               = useState(false);
+  const [showReport, setShowReport]       = useState(false);
+  const [reportReason, setReportReason]   = useState('');
+  const [reportSending, setReportSending] = useState(false);
   const isOwner  = post.author.id === currentUserId;
   const canEditPost = isOwner && canEdit(post.createdAt);
+
+  const handleReport = async () => {
+    if (!reportReason.trim()) return;
+    setReportSending(true);
+    try {
+      await reportsApi.report(post.id, reportReason);
+      onToast('Đã gửi báo cáo thành công!');
+      setShowReport(false);
+      setReportReason('');
+    } catch {
+      onToast('Gửi báo cáo thất bại, thử lại sau.');
+    } finally { setReportSending(false); }
+  };
 
   const mediaType = post.imageUrl ? getMediaType(post.imageUrl) : null;
 
@@ -673,6 +689,12 @@ const PostCard: React.FC<{
                 <button onClick={() => { onDelete(post.id); setShowMenu(false); }}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                   <Trash2 size={14} /> Xóa bài viết
+                </button>
+              )}
+              {!isOwner && (
+                <button onClick={() => { setShowReport(true); setShowMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50">
+                  <Flag size={14} /> Báo cáo bài viết
                 </button>
               )}
             </div>
@@ -756,6 +778,40 @@ const PostCard: React.FC<{
       </div>
 
       {showComments && <CommentSection postId={post.id} />}
+
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm mx-4 shadow-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <Flag size={18} className="text-orange-500" /> Báo cáo bài viết
+              </h2>
+              <button onClick={() => { setShowReport(false); setReportReason(''); }}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-3">Cho chúng tôi biết lý do bạn báo cáo bài viết này.</p>
+            <textarea
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              placeholder="Nhập lý do báo cáo..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none resize-none mb-4 focus:border-[#1877f2]"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setShowReport(false); setReportReason(''); }}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50">
+                Hủy
+              </button>
+              <button onClick={handleReport} disabled={!reportReason.trim() || reportSending}
+                className="flex-1 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition">
+                {reportSending ? 'Đang gửi...' : 'Gửi báo cáo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

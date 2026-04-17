@@ -9,7 +9,7 @@ namespace InteractHub.API.Controllers;
 
 [ApiController]
 [Route("api/admin")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class AdminController : BaseController
 {
     private readonly AppDbContext          _db;
@@ -60,13 +60,14 @@ public class AdminController : BaseController
         return Ok(new { success = true, isActive = user.IsActive });
     }
 
-    // GET /api/admin/posts?page=1
+    // GET /api/admin/posts?page=1&deleted=false
     [HttpGet("posts")]
-    public async Task<IActionResult> GetPosts([FromQuery] int page = 1, [FromQuery] string keyword = "")
+    public async Task<IActionResult> GetPosts([FromQuery] int page = 1, [FromQuery] string keyword = "", [FromQuery] bool deleted = false)
     {
         var query = _db.Posts
             .Include(p => p.User)
             .Include(p => p.PostReports)
+            .Where(p => p.IsDeleted == deleted)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(keyword))
@@ -83,7 +84,7 @@ public class AdminController : BaseController
             })
             .ToListAsync();
 
-        return Ok(new { items = posts, totalCount = total, page, pageSize = 20 });
+        return Ok(new { items = posts, totalCount = total, page, pageSize = 20, hasNext = page * 20 < total });
     }
 
     // DELETE /api/admin/posts/{id}

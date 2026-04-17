@@ -140,27 +140,29 @@ const UsersTab: React.FC = () => {
 
 // ─── POSTS TAB ───────────────────────────────────────────────────────────────
 const PostsTab: React.FC = () => {
-  const [posts, setPosts]   = useState<any[]>([]);
-  const [page, setPage]     = useState(1);
+  const [posts, setPosts]     = useState<any[]>([]);
+  const [page, setPage]       = useState(1);
   const [keyword, setKeyword] = useState('');
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
-  const load = useCallback(async (p: number, kw: string) => {
+  const load = useCallback(async (p: number, kw: string, deleted: boolean) => {
     setLoading(true);
     try {
-      const res = await adminApi.getPosts(p, kw);
+      const res = await adminApi.getPosts(p, kw, deleted);
       setPosts(res.items ?? []);
       setHasNext(res.hasNext ?? false);
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(1, ''); }, [load]);
+  useEffect(() => { setPage(1); load(1, keyword, showDeleted); }, [showDeleted]);
+  useEffect(() => { load(1, '', false); }, [load]);
 
   const search = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    load(1, keyword);
+    load(1, keyword, showDeleted);
   };
 
   const handleDelete = async (id: number) => {
@@ -171,6 +173,20 @@ const PostsTab: React.FC = () => {
 
   return (
     <div>
+      {/* Sub-tabs: Còn lại / Đã xóa */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setShowDeleted(false)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition
+            ${!showDeleted ? 'bg-[#1877f2] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          Bài viết còn lại
+        </button>
+        <button onClick={() => setShowDeleted(true)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition
+            ${showDeleted ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          Bài viết đã xóa
+        </button>
+      </div>
+
       <form onSubmit={search} className="flex gap-2 mb-4">
         <input value={keyword} onChange={e => setKeyword(e.target.value)}
           placeholder="Tìm kiếm bài viết..."
@@ -185,37 +201,46 @@ const PostsTab: React.FC = () => {
       ) : (
         <div className="space-y-2">
           {posts.map(p => (
-            <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-3">
+            <div key={p.id} className={`bg-white rounded-xl border p-3 ${showDeleted ? 'border-red-200 opacity-75' : 'border-gray-200'}`}>
               <div className="flex items-start gap-3">
                 <Avatar name={p.author?.fullName ?? 'U'} src={p.author?.avatarUrl} size={36} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm">{p.author?.fullName}</p>
-                    <p className="text-xs text-gray-400 shrink-0">{timeAgo(p.createdAt)}</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {showDeleted && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Đã xóa</span>}
+                      <p className="text-xs text-gray-400">{timeAgo(p.createdAt)}</p>
+                    </div>
                   </div>
                   <p className="text-sm text-gray-700 mt-1 line-clamp-3">{p.content}</p>
                   {p.imageUrl && <img src={p.imageUrl} className="mt-2 h-24 rounded-lg object-cover" alt="" />}
-                  <p className="text-xs text-gray-400 mt-1">{p.likeCount} thích · {p.commentCount} bình luận · {p.visibility}</p>
+                  <p className="text-xs text-gray-400 mt-1">{p.visibility}{p.reportCount > 0 ? ` · ${p.reportCount} báo cáo` : ''}</p>
                 </div>
-                <button onClick={() => handleDelete(p.id)}
-                  className="shrink-0 flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1.5 rounded-lg text-xs font-medium transition">
-                  <Trash2 size={12} /> Xóa
-                </button>
+                {!showDeleted && (
+                  <button onClick={() => handleDelete(p.id)}
+                    className="shrink-0 flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1.5 rounded-lg text-xs font-medium transition">
+                    <Trash2 size={12} /> Xóa
+                  </button>
+                )}
               </div>
             </div>
           ))}
-          {posts.length === 0 && <p className="text-center text-gray-400 py-12">Không có bài viết nào.</p>}
+          {posts.length === 0 && (
+            <p className="text-center text-gray-400 py-12">
+              {showDeleted ? 'Không có bài viết đã xóa nào.' : 'Không có bài viết nào.'}
+            </p>
+          )}
         </div>
       )}
 
       <div className="flex justify-between items-center mt-4">
-        <button onClick={() => { const np = Math.max(1, page - 1); setPage(np); load(np, keyword); }}
+        <button onClick={() => { const np = Math.max(1, page - 1); setPage(np); load(np, keyword, showDeleted); }}
           disabled={page === 1}
           className="px-3 py-1.5 rounded-lg text-sm border border-gray-200 disabled:opacity-40 hover:bg-gray-100">
           Trang trước
         </button>
         <span className="text-sm text-gray-500">Trang {page}</span>
-        <button onClick={() => { const np = page + 1; setPage(np); load(np, keyword); }}
+        <button onClick={() => { const np = page + 1; setPage(np); load(np, keyword, showDeleted); }}
           disabled={!hasNext}
           className="px-3 py-1.5 rounded-lg text-sm border border-gray-200 disabled:opacity-40 hover:bg-gray-100">
           Trang sau

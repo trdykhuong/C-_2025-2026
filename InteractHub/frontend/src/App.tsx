@@ -22,12 +22,6 @@ const PrivateRoute: React.FC = () => {
   return isAuth ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
-// Chỉ cho phép Admin
-const AdminRoute: React.FC = () => {
-  const { user } = useAuth();
-  return user?.roles?.includes('Admin') ? <Outlet /> : <Navigate to="/" replace />;
-};
-
 // Chỉ cho phép khi chưa đăng nhập
 const GuestRoute: React.FC = () => {
   const { isAuth } = useAuth();
@@ -70,13 +64,11 @@ const App: React.FC = () => (
               <Suspense fallback={<Loader />}><HashtagPage /></Suspense>
             } />
           </Route>
-          {/* Admin-only routes */}
-          <Route element={<AdminRoute />}>
-            <Route element={<MainLayout />}>
-              <Route path="/admin" element={
-                <Suspense fallback={<Loader />}><AdminPage /></Suspense>
-              } />
-            </Route>
+          {/* Admin routes */}
+          <Route element={<MainLayout />}>
+            <Route path="/admin" element={
+              <Suspense fallback={<Loader />}><AdminPage /></Suspense>
+            } />
           </Route>
         </Route>
 

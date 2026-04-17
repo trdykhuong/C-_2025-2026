@@ -44,9 +44,6 @@ public class AuthService
             return ApiResult<AuthResponseDTO>.Fail(errors);
         }
 
-        // Gán role mặc định là "User"
-        await _userManager.AddToRoleAsync(user, "User");
-
         var response = await BuildTokenAsync(user);
         return ApiResult<AuthResponseDTO>.Ok(response, "Đăng ký thành công!");
     }

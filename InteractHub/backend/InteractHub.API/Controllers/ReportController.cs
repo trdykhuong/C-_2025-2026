@@ -34,7 +34,6 @@ public class ReportController : BaseController
 
     // GET /api/reports  – admin xem danh sách báo cáo
     [HttpGet]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll()
     {
         var reports = await _db.PostReports
@@ -45,7 +44,6 @@ public class ReportController : BaseController
 
     // PUT /api/reports/{id}?status=reviewed  – admin cập nhật trạng thái
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStatus(int id, [FromQuery] string status)
     {
         var report = await _db.PostReports.FindAsync(id);

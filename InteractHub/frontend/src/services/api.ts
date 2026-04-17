@@ -85,15 +85,21 @@ export const uploadApi = {
   },
 };
 
+// ── Reports ───────────────────────────────────────────────────────────────────
+export const reportsApi = {
+  report: (postId: number, reason: string) =>
+    http.post<any>(`/reports/${postId}`, { reason }).then(r => r.data),
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
-  getStats:       ()                                => http.get<any>('/admin/stats').then(r => r.data),
-  getUsers:       (page = 1, keyword = '')          => http.get<any>(`/admin/users?page=${page}&keyword=${encodeURIComponent(keyword)}`).then(r => r.data),
-  toggleActive:   (id: string)                      => http.put<any>(`/admin/users/${id}/toggle-active`).then(r => r.data),
-  getPosts:       (page = 1, keyword = '')          => http.get<any>(`/admin/posts?page=${page}&keyword=${encodeURIComponent(keyword)}`).then(r => r.data),
-  deletePost:     (id: number)                      => http.delete<any>(`/admin/posts/${id}`).then(r => r.data),
-  getReports:     (status = 'pending')              => http.get<any[]>(`/admin/reports?status=${status}`).then(r => r.data),
-  updateReport:   (id: number, status: string)      => http.put<any>(`/admin/reports/${id}?status=${status}`).then(r => r.data),
+  getStats:       ()                                          => http.get<any>('/admin/stats').then(r => r.data),
+  getUsers:       (page = 1, keyword = '')                   => http.get<any>(`/admin/users?page=${page}&keyword=${encodeURIComponent(keyword)}`).then(r => r.data),
+  toggleActive:   (id: string)                               => http.put<any>(`/admin/users/${id}/toggle-active`).then(r => r.data),
+  getPosts:       (page = 1, keyword = '', deleted = false)  => http.get<any>(`/admin/posts?page=${page}&keyword=${encodeURIComponent(keyword)}&deleted=${deleted}`).then(r => r.data),
+  deletePost:     (id: number)                               => http.delete<any>(`/admin/posts/${id}`).then(r => r.data),
+  getReports:     (status = 'pending')                       => http.get<any[]>(`/admin/reports?status=${status}`).then(r => r.data),
+  updateReport:   (id: number, status: string)               => http.put<any>(`/admin/reports/${id}?status=${status}`).then(r => r.data),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
