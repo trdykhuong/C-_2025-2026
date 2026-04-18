@@ -153,13 +153,15 @@ const Navbar: React.FC = () => {
                   </div>
                 </Link>
                 <div className="border-t border-gray-100 m-2" />
-                <Link to="/admin" onClick={() => setShowProfile(false)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 text-sm">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <ShieldCheck size={16} className="text-[#1877f2]" />
-                  </div>
-                  Trang quản trị
-                </Link>
+                {user?.isAdmin && (
+                  <Link to="/admin" onClick={() => setShowProfile(false)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 text-sm">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <ShieldCheck size={16} className="text-[#1877f2]" />
+                    </div>
+                    Trang quản trị
+                  </Link>
+                )}
                 <button onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 text-sm">
                   <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">

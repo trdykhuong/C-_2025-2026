@@ -85,6 +85,11 @@ export const uploadApi = {
   },
 };
 
+// ── Hashtags ──────────────────────────────────────────────────────────────────
+export const hashtagsApi = {
+  getTrending: (top = 10) => http.get<{ name: string; count: number }[]>(`/hashtags/trending?top=${top}`).then(r => r.data),
+};
+
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsApi = {
   report: (postId: number, reason: string) =>

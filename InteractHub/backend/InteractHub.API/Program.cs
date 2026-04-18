@@ -161,6 +161,18 @@ using (var scope = app.Services.CreateScope())
         "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Stories' AND COLUMN_NAME='Visibility') " +
         "ALTER TABLE Stories ADD Visibility nvarchar(20) NOT NULL DEFAULT 'public'"); } catch { }
 
+    try { db.Database.ExecuteSqlRaw(
+        "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AspNetUsers' AND COLUMN_NAME='IsAdmin') " +
+        "ALTER TABLE AspNetUsers ADD IsAdmin bit NOT NULL DEFAULT 0"); } catch { }
+
+    try { db.Database.ExecuteSqlRaw(
+        "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Posts' AND COLUMN_NAME='SharedPostId') " +
+        "ALTER TABLE Posts ADD SharedPostId int NULL"); } catch { }
+
+    try { db.Database.ExecuteSqlRaw(
+        "IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_Posts_Posts_SharedPostId') " +
+        "ALTER TABLE Posts ADD CONSTRAINT FK_Posts_Posts_SharedPostId FOREIGN KEY (SharedPostId) REFERENCES Posts(Id)"); } catch { }
+
     // Tạo thư mục uploads nếu chưa có
     var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
     Directory.CreateDirectory(uploadsDir);

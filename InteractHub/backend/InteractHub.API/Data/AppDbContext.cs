@@ -48,6 +48,13 @@ public class AppDbContext : IdentityDbContext<AppUser>
             .HasForeignKey(f => f.ReceiverId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Post self-reference FK – SharedPost
+        builder.Entity<Post>()
+            .HasOne(p => p.SharedPost)
+            .WithMany()
+            .HasForeignKey(p => p.SharedPostId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Comment FK – Restrict để tránh multiple cascade
         builder.Entity<Comment>()
             .HasOne(c => c.User)

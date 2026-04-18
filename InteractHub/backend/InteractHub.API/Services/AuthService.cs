@@ -80,6 +80,7 @@ public class AuthService
             new(ClaimTypes.Name,           user.UserName!),
             new(ClaimTypes.Email,          user.Email!),
             new("fullName",                user.FullName),
+            new("isAdmin",                 user.IsAdmin.ToString().ToLower()),
         };
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
@@ -100,6 +101,7 @@ public class AuthService
             FullName  = user.FullName,
             AvatarUrl = user.AvatarUrl,
             Roles     = roles,
+            IsAdmin   = user.IsAdmin,
             ExpiredAt = expired,
         };
     }

@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { adminApi } from '../services/api';
+import { adminApi, reportsApi } from '../services/api';
 import { Avatar } from '../components/ui/Avatar';
-import { Trash2, UserCheck, UserX, RefreshCw, Flag, FileText, Users } from 'lucide-react';
+import { Trash2, UserCheck, UserX, RefreshCw, Flag, FileText, Users, X } from 'lucide-react';
+
+function getMediaType(url: string): 'video' | 'image' {
+  if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) return 'video';
+  return 'image';
+}
 
 function timeAgo(d: string) {
   const utc = /Z|[+-]\d{2}:?\d{2}$/.test(d) ? d : d + 'Z';
@@ -140,12 +145,15 @@ const UsersTab: React.FC = () => {
 
 // ─── POSTS TAB ───────────────────────────────────────────────────────────────
 const PostsTab: React.FC = () => {
-  const [posts, setPosts]     = useState<any[]>([]);
-  const [page, setPage]       = useState(1);
-  const [keyword, setKeyword] = useState('');
-  const [hasNext, setHasNext] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [posts, setPosts]         = useState<any[]>([]);
+  const [page, setPage]           = useState(1);
+  const [keyword, setKeyword]     = useState('');
+  const [hasNext, setHasNext]     = useState(false);
+  const [loading, setLoading]     = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [reportTarget, setReportTarget] = useState<number | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportSending, setReportSending] = useState(false);
 
   const load = useCallback(async (p: number, kw: string, deleted: boolean) => {
     setLoading(true);
@@ -169,6 +177,16 @@ const PostsTab: React.FC = () => {
     if (!confirm('Xóa bài viết này?')) return;
     await adminApi.deletePost(id);
     setPosts(p => p.filter(x => x.id !== id));
+  };
+
+  const handleReport = async () => {
+    if (!reportTarget || !reportReason.trim()) return;
+    setReportSending(true);
+    try {
+      await reportsApi.report(reportTarget, reportReason);
+      setReportTarget(null);
+      setReportReason('');
+    } finally { setReportSending(false); }
   };
 
   return (
@@ -213,15 +231,27 @@ const PostsTab: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-sm text-gray-700 mt-1 line-clamp-3">{p.content}</p>
-                  {p.imageUrl && <img src={p.imageUrl} className="mt-2 h-24 rounded-lg object-cover" alt="" />}
+                  {p.imageUrl && (() => {
+                    const t = getMediaType(p.imageUrl);
+                    if (t === 'image') return <img src={p.imageUrl} className="mt-2 h-24 rounded-lg object-cover" alt="" />;
+                    return <video src={p.imageUrl} className="mt-2 h-24 rounded-lg" />;
+                  })()}
                   <p className="text-xs text-gray-400 mt-1">{p.visibility}{p.reportCount > 0 ? ` · ${p.reportCount} báo cáo` : ''}</p>
                 </div>
-                {!showDeleted && (
-                  <button onClick={() => handleDelete(p.id)}
-                    className="shrink-0 flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1.5 rounded-lg text-xs font-medium transition">
-                    <Trash2 size={12} /> Xóa
-                  </button>
-                )}
+                <div className="shrink-0 flex flex-col gap-1">
+                  {!showDeleted && (
+                    <button onClick={() => handleDelete(p.id)}
+                      className="flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1.5 rounded-lg text-xs font-medium transition">
+                      <Trash2 size={12} /> Xóa
+                    </button>
+                  )}
+                  {!showDeleted && (
+                    <button onClick={() => { setReportTarget(p.id); setReportReason(''); }}
+                      className="flex items-center gap-1 bg-orange-50 text-orange-600 hover:bg-orange-100 px-2 py-1.5 rounded-lg text-xs font-medium transition">
+                      <Flag size={12} /> Báo cáo
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -246,6 +276,39 @@ const PostsTab: React.FC = () => {
           Trang sau
         </button>
       </div>
+
+      {reportTarget !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-sm mx-4 shadow-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-base flex items-center gap-2">
+                <Flag size={16} className="text-orange-500" /> Báo cáo bài viết
+              </h2>
+              <button onClick={() => setReportTarget(null)}
+                className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+                <X size={14} />
+              </button>
+            </div>
+            <textarea
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              placeholder="Nhập lý do báo cáo..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none resize-none mb-3 focus:border-[#1877f2]"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setReportTarget(null)}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50">
+                Hủy
+              </button>
+              <button onClick={handleReport} disabled={!reportReason.trim() || reportSending}
+                className="flex-1 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition">
+                {reportSending ? 'Đang gửi...' : 'Gửi báo cáo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -16,7 +16,7 @@ public class PostController : BaseController
     // GET /api/posts/feed?page=1&pageSize=10
     [HttpGet("feed")]
     public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        => Ok(await _postService.GetFeedAsync(CurrentUserId, page, pageSize));
+        => Ok(await _postService.GetFeedAsync(CurrentUserId, page, pageSize, IsAdmin));
 
     // GET /api/posts/user/{userId}
     [HttpGet("user/{userId}")]

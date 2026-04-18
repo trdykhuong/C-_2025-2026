@@ -15,9 +15,15 @@ public class PostService
         _notifService = notifService;
     }
 
-    // ── Feed (bài đăng của bạn bè + bản thân) ───────────────────────────────
-    public async Task<PagedResult<PostResponseDTO>> GetFeedAsync(string userId, int page, int pageSize)
+    // ── Feed (bài đăng của bạn bè + bản thân; admin thấy tất cả) ────────────
+    public async Task<PagedResult<PostResponseDTO>> GetFeedAsync(string userId, int page, int pageSize, bool isAdmin = false)
     {
+        if (isAdmin)
+        {
+            var (allTotal, allPosts) = await _repo.GetAllPostsPagedAsync(page, pageSize);
+            return BuildPaged(allPosts, userId, allTotal, page, pageSize);
+        }
+
         var friendIds = await _repo.GetFriendIdsAsync(userId);
         friendIds.Add(userId);
 
@@ -50,12 +56,16 @@ public class PostService
     // ── Tạo bài đăng ────────────────────────────────────────────────────────
     public async Task<ApiResult<PostResponseDTO>> CreateAsync(string userId, CreatePostDTO dto)
     {
+        if (string.IsNullOrWhiteSpace(dto.Content) && dto.SharedPostId == null && string.IsNullOrWhiteSpace(dto.ImageUrl))
+            return ApiResult<PostResponseDTO>.Fail("Nội dung bài viết không được để trống.");
+
         var post = new Post
         {
-            Content    = dto.Content,
-            ImageUrl   = dto.ImageUrl,
-            Visibility = dto.Visibility,
-            UserId     = userId,
+            Content      = dto.Content,
+            ImageUrl     = dto.ImageUrl,
+            Visibility   = dto.Visibility,
+            UserId       = userId,
+            SharedPostId = dto.SharedPostId,
         };
 
         foreach (var tagName in dto.Hashtags.Distinct())
@@ -68,6 +78,9 @@ public class PostService
         _repo.Add(post);
         await _repo.SaveChangesAsync();
         await _repo.LoadUserAsync(post);
+
+        if (dto.SharedPostId.HasValue)
+            post.SharedPost = await _repo.FindActiveWithUserAsync(dto.SharedPostId.Value);
 
         return ApiResult<PostResponseDTO>.Ok(MapToDTO(post, userId), "Đăng bài thành công!");
     }
@@ -147,5 +160,14 @@ public class PostService
         CommentCount         = p.Comments.Count(c => !c.IsDeleted),
         IsLikedByCurrentUser = p.Likes.Any(l => l.UserId == currentUserId),
         Hashtags             = p.PostHashtags.Select(ph => ph.Hashtag.Name).ToList(),
+        SharedPostId         = p.SharedPostId,
+        SharedPost           = p.SharedPost == null ? null : new SharedPostSummaryDTO
+        {
+            Id        = p.SharedPost.Id,
+            Content   = p.SharedPost.Content,
+            ImageUrl  = p.SharedPost.ImageUrl,
+            CreatedAt = p.SharedPost.CreatedAt,
+            Author    = new UserSummaryDTO { Id = p.SharedPost.User.Id, UserName = p.SharedPost.User.UserName!, FullName = p.SharedPost.User.FullName, AvatarUrl = p.SharedPost.User.AvatarUrl },
+        },
     };
 }

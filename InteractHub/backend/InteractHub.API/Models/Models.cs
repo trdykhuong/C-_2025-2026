@@ -12,6 +12,7 @@ public class AppUser : IdentityUser
     public string?   CoverUrl   { get; set; }
     public DateTime  CreatedAt  { get; set; } = DateTime.UtcNow;
     public bool      IsActive   { get; set; } = true;
+    public bool      IsAdmin    { get; set; } = false;
 }
 
 // ─── POST ─────────────────────────────────────────────────────────────────────
@@ -28,6 +29,10 @@ public class Post
     // FK
     public string  UserId { get; set; } = string.Empty;
     public AppUser User   { get; set; } = null!;
+
+    // Share
+    public int?  SharedPostId { get; set; }
+    public Post? SharedPost   { get; set; }
 
     // Nav
     public List<Comment>     Comments    { get; set; } = new();

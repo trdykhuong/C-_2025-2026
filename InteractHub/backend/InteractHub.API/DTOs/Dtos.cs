@@ -60,6 +60,7 @@ public class AuthResponseDTO
     public string        FullName { get; set; } = string.Empty;
     public string?       AvatarUrl{ get; set; }
     public IList<string> Roles    { get; set; } = new List<string>();
+    public bool          IsAdmin  { get; set; } = false;
     public DateTime      ExpiredAt{ get; set; }
 }
 
@@ -94,17 +95,26 @@ public class UpdateProfileDTO
 // ════════════════════════════════════════════════════════════
 public class CreatePostDTO
 {
-    [Required, MinLength(1), MaxLength(2000)]
-    public string       Content    { get; set; } = string.Empty;
-    public string?      ImageUrl   { get; set; }
+    [MaxLength(2000)] public string Content    { get; set; } = string.Empty;
+    public string?    ImageUrl   { get; set; }
     [MaxLength(20)] public string Visibility { get; set; } = "public";
     public List<string> Hashtags   { get; set; } = new();
+    public int?       SharedPostId { get; set; }
 }
 
 public class UpdatePostDTO
 {
     [Required, MinLength(1), MaxLength(2000)]
     public string Content { get; set; } = string.Empty;
+}
+
+public class SharedPostSummaryDTO
+{
+    public int            Id        { get; set; }
+    public string         Content   { get; set; } = string.Empty;
+    public string?        ImageUrl  { get; set; }
+    public DateTime       CreatedAt { get; set; }
+    public UserSummaryDTO Author    { get; set; } = null!;
 }
 
 public class PostResponseDTO
@@ -120,6 +130,8 @@ public class PostResponseDTO
     public int           CommentCount          { get; set; }
     public bool          IsLikedByCurrentUser  { get; set; }
     public List<string>  Hashtags              { get; set; } = new();
+    public int?                SharedPostId    { get; set; }
+    public SharedPostSummaryDTO? SharedPost    { get; set; }
 }
 
 // ════════════════════════════════════════════════════════════

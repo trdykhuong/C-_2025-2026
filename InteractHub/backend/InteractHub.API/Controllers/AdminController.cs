@@ -43,7 +43,7 @@ public class AdminController : BaseController
         var total = await query.CountAsync();
         var users = await query.OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * 20).Take(20)
-            .Select(u => new { u.Id, u.UserName, u.FullName, u.Email, u.AvatarUrl, u.IsActive, u.CreatedAt })
+            .Select(u => new { u.Id, u.UserName, u.FullName, u.Email, u.AvatarUrl, u.IsActive, u.IsAdmin, u.CreatedAt })
             .ToListAsync();
 
         return Ok(new { items = users, totalCount = total, page, pageSize = 20 });

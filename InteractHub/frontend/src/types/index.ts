@@ -9,7 +9,11 @@ export interface UserProfile extends UserSummary {
 }
 export interface AuthUser {
   token: string; userId: string; userName: string; fullName: string;
-  avatarUrl?: string; roles: string[]; expiredAt: string;
+  avatarUrl?: string; roles: string[]; isAdmin: boolean; expiredAt: string;
+}
+export interface SharedPost {
+  id: number; content: string; imageUrl?: string;
+  createdAt: string; author: UserSummary;
 }
 export interface Post {
   id: number; content: string; imageUrl?: string;
@@ -17,6 +21,7 @@ export interface Post {
   createdAt: string; updatedAt?: string;
   author: UserSummary; likeCount: number; commentCount: number;
   isLikedByCurrentUser: boolean; hashtags: string[];
+  sharedPostId?: number; sharedPost?: SharedPost;
 }
 export interface Comment {
   id: number; content: string; createdAt: string; author: UserSummary;

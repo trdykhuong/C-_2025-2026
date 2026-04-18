@@ -29,6 +29,15 @@ public class PostRepository : IPostRepository
         return await ExecutePagedAsync(query, page, pageSize);
     }
 
+    public async Task<(int Total, List<Post> Items)> GetAllPostsPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Posts
+            .Where(p => !p.IsDeleted)
+            .OrderByDescending(p => p.CreatedAt);
+
+        return await ExecutePagedAsync(query, page, pageSize);
+    }
+
     public async Task<(int Total, List<Post> Items)> GetByUserPagedAsync(string userId, int page, int pageSize)
     {
         var query = _db.Posts
@@ -89,6 +98,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.Likes)
             .Include(p => p.Comments.Where(c => !c.IsDeleted))
             .Include(p => p.PostHashtags).ThenInclude(ph => ph.Hashtag)
+            .Include(p => p.SharedPost!).ThenInclude(sp => sp.User)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

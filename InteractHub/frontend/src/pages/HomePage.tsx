@@ -5,8 +5,8 @@ import {
   MoreHorizontal, Globe, Lock, Users, Trash2, X, Send,
   Plus, Pencil, Check, Copy, Eye, Upload, Flag,
 } from 'lucide-react';
-import { postsApi, commentsApi, storiesApi, uploadApi, reportsApi } from '../services/api';
-import type { Post, Comment, Story } from '../types';
+import { postsApi, commentsApi, storiesApi, uploadApi, reportsApi, hashtagsApi } from '../services/api';
+import type { Post, Comment, Story, SharedPost } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
 
@@ -585,6 +585,30 @@ const CommentSection: React.FC<{ postId: number }> = ({ postId }) => {
   );
 };
 
+// ─── SHARED POST PREVIEW ─────────────────────────────────────────────────────
+const SharedPostPreview: React.FC<{ sp: SharedPost }> = ({ sp }) => {
+  const mt = sp.imageUrl ? getMediaType(sp.imageUrl) : null;
+  return (
+    <div className="border border-gray-200 rounded-xl mx-4 mb-3 overflow-hidden bg-gray-50">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+        <Avatar name={sp.author.fullName} src={sp.author.avatarUrl} size={28} />
+        <div>
+          <Link to={`/profile/${sp.author.id}`} className="font-semibold text-xs hover:underline">{sp.author.fullName}</Link>
+          <p className="text-[10px] text-gray-400">{timeAgo(sp.createdAt)}</p>
+        </div>
+      </div>
+      {sp.content && (
+        <p className="text-sm text-gray-700 px-3 py-2 leading-relaxed line-clamp-4">
+          <ContentWithHashtags text={sp.content} />
+        </p>
+      )}
+      {sp.imageUrl && mt === 'image'   && <img src={sp.imageUrl} alt="" className="w-full max-h-56 object-cover" />}
+      {sp.imageUrl && mt === 'video'   && <video src={sp.imageUrl} controls className="w-full max-h-56 bg-black" />}
+      {sp.imageUrl && mt === 'youtube' && <iframe src={`https://www.youtube.com/embed/${getYouTubeId(sp.imageUrl)}`} className="w-full h-44" allowFullScreen />}
+    </div>
+  );
+};
+
 // ─── POST CARD ────────────────────────────────────────────────────────────────
 const PostCard: React.FC<{
   post: Post;
@@ -593,7 +617,9 @@ const PostCard: React.FC<{
   onDelete: (id: number) => void;
   onUpdate: (id: number, content: string) => void;
   onToast: (msg: string) => void;
-}> = ({ post, currentUserId, onLike, onDelete, onUpdate, onToast }) => {
+  onShared: (p: Post) => void;
+}> = ({ post, currentUserId, onLike, onDelete, onUpdate, onToast, onShared }) => {
+  const { user }                          = useAuth();
   const [showComments, setShowComments]   = useState(false);
   const [showMenu, setShowMenu]           = useState(false);
   const [editing, setEditing]             = useState(false);
@@ -602,6 +628,10 @@ const PostCard: React.FC<{
   const [showReport, setShowReport]       = useState(false);
   const [reportReason, setReportReason]   = useState('');
   const [reportSending, setReportSending] = useState(false);
+  const [showShare, setShowShare]         = useState(false);
+  const [shareContent, setShareContent]   = useState('');
+  const [shareVis, setShareVis]           = useState<Visibility>('public');
+  const [shareLoading, setShareLoading]   = useState(false);
   const isOwner  = post.author.id === currentUserId;
   const canEditPost = isOwner && canEdit(post.createdAt);
 
@@ -618,15 +648,33 @@ const PostCard: React.FC<{
     } finally { setReportSending(false); }
   };
 
-  const mediaType = post.imageUrl ? getMediaType(post.imageUrl) : null;
+  const handleShareSubmit = async () => {
+    setShareLoading(true);
+    try {
+      const { data } = await postsApi.create({
+        content: shareContent,
+        visibility: shareVis,
+        hashtags: extractHashtags(shareContent),
+        sharedPostId: post.id,
+      });
+      if (data.success && data.data) {
+        onShared(data.data);
+        onToast('Đã chia sẻ bài viết!');
+        setShowShare(false);
+        setShareContent('');
+      }
+    } finally { setShareLoading(false); }
+  };
 
-  const handleShare = async () => {
+  const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
       onToast('Đã sao chép liên kết!');
     } catch { onToast('Không thể sao chép liên kết.'); }
     setShowMenu(false);
   };
+
+  const mediaType = post.imageUrl ? getMediaType(post.imageUrl) : null;
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
@@ -675,7 +723,7 @@ const PostCard: React.FC<{
           </button>
           {showMenu && (
             <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-xl shadow-lg z-10 py-1 min-w-[180px]">
-              <button onClick={handleShare}
+              <button onClick={handleCopyLink}
                 className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50">
                 <Copy size={14} className="text-gray-500" /> Sao chép liên kết
               </button>
@@ -742,6 +790,9 @@ const PostCard: React.FC<{
         <iframe src={`https://www.youtube.com/embed/${getYouTubeId(post.imageUrl)}`} className="w-full h-64" allowFullScreen />
       )}
 
+      {/* Shared post preview */}
+      {post.sharedPost && <SharedPostPreview sp={post.sharedPost} />}
+
       {/* Counts */}
       {(post.likeCount > 0 || post.commentCount > 0) && (
         <div className="flex items-center justify-between px-4 py-2 text-xs text-gray-500">
@@ -766,7 +817,7 @@ const PostCard: React.FC<{
         {[
           { icon: ThumbsUp,      label: 'Thích',     active: post.isLikedByCurrentUser, color: '#1877f2', action: () => onLike(post.id) },
           { icon: MessageCircle, label: 'Bình luận', active: false, color: '#606770',   action: () => setShowComments(v => !v) },
-          { icon: Share2,        label: 'Chia sẻ',   active: false, color: '#606770',   action: handleShare },
+          { icon: Share2,        label: 'Chia sẻ',   active: false, color: '#606770',   action: () => { setShowShare(true); setShowMenu(false); } },
         ].map(({ icon: Icon, label, active, color, action }) => (
           <button key={label} onClick={action}
             className="flex-1 flex items-center justify-center gap-2 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium transition"
@@ -775,6 +826,14 @@ const PostCard: React.FC<{
             <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
+        {!isOwner && (
+          <button onClick={() => setShowReport(true)}
+            title="Báo cáo bài viết"
+            className="flex items-center justify-center gap-2 px-3 py-1.5 hover:bg-orange-50 rounded-lg text-sm font-medium transition text-gray-400 hover:text-orange-500">
+            <Flag size={16} />
+            <span className="hidden sm:inline">Báo cáo</span>
+          </button>
+        )}
       </div>
 
       {showComments && <CommentSection postId={post.id} />}
@@ -810,6 +869,96 @@ const PostCard: React.FC<{
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showShare && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-lg mx-4 shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div className="w-8" />
+              <h2 className="font-semibold text-base">Chia sẻ bài viết</h2>
+              <button onClick={() => setShowShare(false)}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Avatar name={user?.fullName ?? 'U'} src={user?.avatarUrl} size={36} />
+                <div>
+                  <p className="font-semibold text-sm">{user?.fullName}</p>
+                  <div className="flex gap-1 mt-0.5">
+                    {VISIBILITY_OPTIONS.map(o => {
+                      const OIcon = o.icon;
+                      return (
+                        <button key={o.value} onClick={() => setShareVis(o.value)}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition
+                            ${shareVis === o.value ? 'bg-blue-100 text-[#1877f2]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          <OIcon size={10} /> {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <textarea
+                value={shareContent}
+                onChange={e => setShareContent(e.target.value)}
+                placeholder="Viết gì đó về bài viết này..."
+                rows={3}
+                className="w-full resize-none outline-none text-sm mb-3 placeholder-gray-400"
+                autoFocus
+              />
+              {/* Original post preview */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 mb-3">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+                  <Avatar name={post.author.fullName} src={post.author.avatarUrl} size={26} />
+                  <span className="font-semibold text-xs">{post.author.fullName}</span>
+                  <span className="text-[10px] text-gray-400">{timeAgo(post.createdAt)}</span>
+                </div>
+                {post.content && <p className="text-sm text-gray-700 px-3 py-2 line-clamp-3">{post.content}</p>}
+                {post.imageUrl && mediaType === 'image' && <img src={post.imageUrl} alt="" className="w-full max-h-40 object-cover" />}
+              </div>
+            </div>
+            <div className="px-4 pb-4">
+              <button onClick={handleShareSubmit} disabled={shareLoading}
+                className="w-full bg-[#1877f2] text-white font-semibold py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">
+                {shareLoading ? 'Đang chia sẻ...' : 'Chia sẻ ngay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── TRENDING HASHTAGS ────────────────────────────────────────────────────────
+const TrendingHashtags: React.FC = () => {
+  const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
+
+  useEffect(() => {
+    hashtagsApi.getTrending(10).then(setTags).catch(() => {});
+  }, []);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sticky top-20">
+      <h3 className="font-bold text-sm mb-3 text-gray-800">Hashtag xu hướng</h3>
+      {tags.length === 0 ? (
+        <p className="text-xs text-gray-400">Chưa có hashtag nào.</p>
+      ) : (
+        <div className="space-y-2">
+          {tags.map((t, i) => (
+            <Link key={t.name} to={`/hashtag/${t.name}`}
+              className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 transition group">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-gray-400 w-4 shrink-0">{i + 1}</span>
+                <span className="text-sm font-medium text-[#1877f2] truncate">#{t.name}</span>
+              </div>
+              <span className="text-[10px] text-gray-400 shrink-0">{t.count} bài</span>
+            </Link>
+          ))}
         </div>
       )}
     </div>
@@ -896,32 +1045,46 @@ const HomePage: React.FC = () => {
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, content, updatedAt: new Date().toISOString() } : p));
   };
 
+  const handleShared = (newPost: Post) => {
+    setPosts(prev => [newPost, ...prev]);
+    latestIdRef.current = newPost.id;
+  };
+
   return (
-    <div className="max-w-[680px] mx-auto px-2 sm:px-0 py-4">
-      {newCount > 0 && (
-        <button onClick={loadNewPosts}
-          className="w-full mb-3 bg-[#1877f2] text-white text-sm font-semibold py-2.5 rounded-xl shadow hover:bg-blue-600 transition">
-          {newCount} bài viết mới — Nhấn để tải
-        </button>
-      )}
+    <div className="max-w-[1080px] mx-auto px-2 sm:px-4 py-4 flex gap-4">
+      {/* Left sidebar – trending hashtags */}
+      <aside className="hidden lg:block w-60 shrink-0">
+        <TrendingHashtags />
+      </aside>
 
-      <StoryBar />
-      <CreatePostBox onCreated={p => { setPosts(prev => [p, ...prev]); latestIdRef.current = p.id; }} />
+      {/* Main feed */}
+      <div className="flex-1 min-w-0 max-w-[680px]">
+        {newCount > 0 && (
+          <button onClick={loadNewPosts}
+            className="w-full mb-3 bg-[#1877f2] text-white text-sm font-semibold py-2.5 rounded-xl shadow hover:bg-blue-600 transition">
+            {newCount} bài viết mới — Nhấn để tải
+          </button>
+        )}
 
-      {posts.map(p => (
-        <PostCard
-          key={p.id} post={p}
-          currentUserId={user?.userId ?? ''}
-          onLike={handleLike}
-          onDelete={handleDelete}
-          onUpdate={handleUpdate}
-          onToast={setToast}
-        />
-      ))}
+        <StoryBar />
+        <CreatePostBox onCreated={p => { setPosts(prev => [p, ...prev]); latestIdRef.current = p.id; }} />
 
-      <div ref={loaderRef} className="h-10 flex items-center justify-center">
-        {loading && <div className="w-6 h-6 border-2 border-[#1877f2] border-t-transparent rounded-full animate-spin" />}
-        {!hasMore && posts.length > 0 && <p className="text-xs text-gray-400">Bạn đã xem hết bài viết</p>}
+        {posts.map(p => (
+          <PostCard
+            key={p.id} post={p}
+            currentUserId={user?.userId ?? ''}
+            onLike={handleLike}
+            onDelete={handleDelete}
+            onUpdate={handleUpdate}
+            onToast={setToast}
+            onShared={handleShared}
+          />
+        ))}
+
+        <div ref={loaderRef} className="h-10 flex items-center justify-center">
+          {loading && <div className="w-6 h-6 border-2 border-[#1877f2] border-t-transparent rounded-full animate-spin" />}
+          {!hasMore && posts.length > 0 && <p className="text-xs text-gray-400">Bạn đã xem hết bài viết</p>}
+        </div>
       </div>
 
       {toast && <Toast msg={toast} onDone={() => setToast('')} />}
