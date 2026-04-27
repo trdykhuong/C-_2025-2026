@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>Báo cáo bài viết</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:24px;}
+  h1{color:#1877f2;margin-bottom:4px;}
+  .back{display:inline-block;margin-bottom:20px;color:#1877f2;text-decoration:none;font-size:14px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:28px;margin-bottom:24px;}
+  h2{color:#1877f2;font-size:17px;margin:0 0 8px;}
+  p{color:#606770;font-size:14px;margin:0 0 16px;}
+  .mermaid{background:#fafafa;border:1px solid #e4e6eb;border-radius:8px;padding:20px;text-align:center;overflow-x:auto;}
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← Quay lại danh sách</a>
+<h1>Báo cáo bài viết</h1>
+
+<div class="card">
+  <h2>Luồng báo cáo</h2>
+  <p>Người dùng thấy nút Báo cáo trên bài của người khác. Admin nhận và xử lý trong trang quản trị.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Thấy bài viết vi phạm"] --> B{"Bài của chính mình"}
+    B -->|Co| C["Không hiện nút Báo cáo"]
+    B -->|Khong| D["Click nút Báo cáo"]
+    D --> E["Mở Report Modal<br/>Nhập lý do báo cáo"]
+    E --> F["POST /api/reports<br/>postId và reason"]
+    F --> G["Tạo PostReport<br/>status = pending<br/>CreatedAt = thời điểm hiện tại"]
+    G --> H["Toast: Đã gửi báo cáo thành công"]
+    H --> I["Admin vào trang quản trị"]
+    I --> J["GET /api/admin/reports?status=pending"]
+    J --> K["Hiện danh sách báo cáo<br/>kèm nội dung bài và người báo cáo"]
+    K --> L{"Admin quyết định"}
+    L -->|Xoa bai| M["DELETE /api/admin/posts/id<br/>IsDeleted = true"]
+    L -->|Bo qua| N["PUT reports/id?status=dismissed"]
+    L -->|Da xu ly| O["PUT reports/id?status=resolved"]
+    M --> P["Bài bị xóa khỏi feed"]
+
+    style C fill:#f5f5f5,stroke:#999
+    style H fill:#e8fde8,stroke:#2e7d32
+    style P fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+</body>
+</html>

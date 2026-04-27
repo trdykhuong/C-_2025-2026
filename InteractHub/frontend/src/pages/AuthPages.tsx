@@ -114,7 +114,7 @@ export const RegisterPage: React.FC = () => {
           {errors.email && <p className="text-red-500 text-xs -mt-2">{String(errors.email.message)}</p>}
 
           <div>
-            <input {...register('password', { required: 'Bắt buộc', minLength: { value: 8, message: 'Tối thiểu 8 ký tự' } })}
+            <input {...register('password', { required: 'Bắt buộc', minLength: { value: 8, message: 'Tối thiểu 8 ký tự' }, validate: v => /[0-9]/.test(v) || 'Mật khẩu phải chứa ít nhất 1 chữ số' })}
               type="password" placeholder="Mật khẩu mới" className={`${inputClass} w-full`} />
             {errors.password && <p className="text-red-500 text-xs mt-1">{String(errors.password.message)}</p>}
             <PasswordStrength pwd={pwd} />

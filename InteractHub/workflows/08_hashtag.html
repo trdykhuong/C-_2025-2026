@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>Hệ thống Hashtag</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:24px;}
+  h1{color:#1877f2;margin-bottom:4px;}
+  .back{display:inline-block;margin-bottom:20px;color:#1877f2;text-decoration:none;font-size:14px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:28px;margin-bottom:24px;}
+  h2{color:#1877f2;font-size:17px;margin:0 0 8px;}
+  p{color:#606770;font-size:14px;margin:0 0 16px;}
+  .mermaid{background:#fafafa;border:1px solid #e4e6eb;border-radius:8px;padding:20px;text-align:center;overflow-x:auto;}
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← Quay lại danh sách</a>
+<h1>Hệ thống Hashtag</h1>
+
+<div class="card">
+  <h2>Tạo và lưu hashtag khi đăng bài</h2>
+  <p>Hashtag tự động được extract từ nội dung bài viết và lưu vào bảng riêng.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Gõ nội dung có chứa hashtag<br/>Ví dụ: Hôm nay #dep qua"] --> B["Frontend dùng regex extract<br/>tìm tất cả chuỗi dạng #tag"]
+    B --> C["Gửi hashtags array cùng POST /api/posts"]
+    C --> D["Backend xử lý từng hashtag"]
+    D --> E{"Hashtag đã tồn tại trong DB"}
+    E -->|Co| F["Lấy Hashtag entity có sẵn"]
+    E -->|Khong| G["Tạo Hashtag entity mới"]
+    F --> H["Tạo PostHashtag liên kết Post và Hashtag"]
+    G --> H
+    H --> I["Lưu DB: bảng PostHashtags"]
+
+    style I fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<div class="card">
+  <h2>Trending Hashtag - Sidebar trang chủ</h2>
+  <p>Top 10 hashtag có nhiều bài viết nhất được hiện ở sidebar bên trái trang chủ.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Trang chủ load"] --> B["GET /api/hashtags/trending?top=10"]
+    B --> C["GROUP BY Hashtag.Name<br/>COUNT số bài viết mỗi tag<br/>ORDER BY COUNT giảm dần"]
+    C --> D["Trả danh sách top 10<br/>tên tag và số lượng bài"]
+    D --> E["Sidebar hiển thị<br/>ví dụ: dep - 42 bai"]
+    E --> F["Click vào tag trong sidebar"]
+    F --> G["Chuyển đến trang hashtag"]
+
+    style D fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<div class="card">
+  <h2>Trang danh sách bài theo Hashtag</h2>
+  <p>Click vào hashtag trong bài viết hoặc sidebar để xem toàn bộ bài viết có tag đó.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Click hashtag trong bài viết"] --> B["Router chuyển đến /hashtag/tenTag"]
+    B --> C["HashtagPage khởi động"]
+    C --> D["GET /api/posts/hashtag/tenTag?page=1"]
+    D --> E["JOIN PostHashtags voi Hashtags<br/>WHERE Hashtag.Name = tenTag<br/>ORDER BY CreatedAt giảm dần"]
+    E --> F["Trả danh sách bài viết có tag đó"]
+    F --> G["Hiển thị bài viết với đầy đủ chức năng<br/>Like, Bình luận, Báo cáo"]
+    G --> H["IntersectionObserver - Infinite scroll"]
+
+    style F fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>Đăng nhập</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:24px;}
+  h1{color:#1877f2;margin-bottom:4px;}
+  .back{display:inline-block;margin-bottom:20px;color:#1877f2;text-decoration:none;font-size:14px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:28px;margin-bottom:24px;}
+  h2{color:#1877f2;font-size:17px;margin:0 0 8px;}
+  p{color:#606770;font-size:14px;margin:0 0 16px;}
+  .mermaid{background:#fafafa;border:1px solid #e4e6eb;border-radius:8px;padding:20px;text-align:center;overflow-x:auto;}
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← Quay lại danh sách</a>
+<h1>Đăng nhập</h1>
+
+<div class="card">
+  <h2>Luồng đăng nhập</h2>
+  <p>Kiểm tra email, trạng thái tài khoản, mật khẩu đúng rồi phát JWT. Token lưu localStorage, toàn app đọc qua AuthContext.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Nhập Email và Password"] --> B["POST /api/auth/login"]
+    B --> C{"Tìm thấy user theo Email"}
+    C -->|Khong| D["Lỗi: Sai email hoặc mật khẩu"]
+    C -->|Co| E{"IsActive = true"}
+    E -->|Khong| F["Lỗi: Tài khoản bị khóa"]
+    E -->|Co| G{"Password khớp"}
+    G -->|Khong| H["Lỗi: Sai email hoặc mật khẩu"]
+    G -->|Co| I["Tạo JWT Token HMAC-SHA256<br/>hết hạn sau 24h"]
+    I --> J["Trả token, user info, isAdmin flag"]
+    J --> K["Lưu token vào localStorage<br/>AuthContext cập nhật toàn app"]
+    K --> L{"isAdmin = true"}
+    L -->|Co| M["Thấy link Trang quản trị<br/>Thấy toàn bộ bài viết"]
+    L -->|Khong| N["Trang chủ bình thường"]
+
+    style D fill:#fde8e8,stroke:#e53935
+    style F fill:#fde8e8,stroke:#e53935
+    style H fill:#fde8e8,stroke:#e53935
+    style J fill:#e8fde8,stroke:#2e7d32
+    style M fill:#fff3e0,stroke:#e65100
+    style N fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+</body>
+</html>

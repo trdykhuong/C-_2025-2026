@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>Like và Bình luận</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:24px;}
+  h1{color:#1877f2;margin-bottom:4px;}
+  .back{display:inline-block;margin-bottom:20px;color:#1877f2;text-decoration:none;font-size:14px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:28px;margin-bottom:24px;}
+  h2{color:#1877f2;font-size:17px;margin:0 0 8px;}
+  p{color:#606770;font-size:14px;margin:0 0 16px;}
+  .mermaid{background:#fafafa;border:1px solid #e4e6eb;border-radius:8px;padding:20px;text-align:center;overflow-x:auto;}
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← Quay lại danh sách</a>
+<h1>Like và Bình luận</h1>
+
+<div class="card">
+  <h2>Like / Unlike bài viết</h2>
+  <p>Optimistic update: UI cập nhật ngay không chờ server. Click lần 2 sẽ unlike.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Click nút Thích"] --> B["UI cập nhật ngay - Optimistic Update<br/>likeCount tăng hoặc giảm 1"]
+    B --> C["POST /api/posts/id/like"]
+    C --> D["Tìm Like theo postId và userId trong DB"]
+    D --> E{"Đã like trước đó"}
+    E -->|Co| F["Xóa Like - Unlike"]
+    E -->|Khong| G["Tạo Like mới"]
+    G --> H{"Chủ bài là người khác"}
+    H -->|Co| I["Tạo Notification cho chủ bài"]
+    H -->|Khong| J
+    F --> J["Trả kết quả cho frontend"]
+    I --> J
+
+    style B fill:#fff3e0,stroke:#e65100
+    style I fill:#e8f4fd,stroke:#1877f2
+    style J fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<div class="card">
+  <h2>Bình luận bài viết</h2>
+  <p>Mở CommentSection, load danh sách, gõ bình luận, gửi và append ngay vào cuối danh sách.</p>
+  <div class="mermaid">
+flowchart TD
+    A["Click vào bài để mở CommentSection"] --> B["GET /api/comments/postId"]
+    B --> C["Hiển thị danh sách bình luận"]
+    C --> D["Gõ nội dung và nhấn Gửi"]
+    D --> E["POST /api/comments<br/>postId và content"]
+    E --> F["Tạo Comment, gán UserId và PostId"]
+    F --> G{"Chủ bài là người khác"}
+    G -->|Co| H["Tạo Notification cho chủ bài"]
+    G -->|Khong| I
+    H --> I["Trả CommentDTO về frontend"]
+    I --> J["Append bình luận mới vào cuối danh sách"]
+    J --> K["Click nút Xóa bình luận"]
+    K --> L["DELETE /api/comments/id"]
+    L --> M["comment.IsDeleted = true trong DB"]
+    M --> N["Xóa bình luận khỏi UI"]
+
+    style H fill:#e8f4fd,stroke:#1877f2
+    style I fill:#e8fde8,stroke:#2e7d32
+    style N fill:#e8fde8,stroke:#2e7d32
+  </div>
+</div>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+</body>
+</html>

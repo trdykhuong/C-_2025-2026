@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>Hiển thị Feed</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;margin:0;padding:24px;}
+  h1{color:#1877f2;margin-bottom:4px;}
+  .back{display:inline-block;margin-bottom:20px;color:#1877f2;text-decoration:none;font-size:14px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:28px;margin-bottom:24px;}
+  h2{color:#1877f2;font-size:17px;margin:0 0 8px;}
+  p{color:#606770;font-size:14px;margin:0 0 16px;}
+  .mermaid{background:#fafafa;border:1px solid #e4e6eb;border-radius:8px;padding:20px;text-align:center;overflow-x:auto;}
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← Quay lại danh sách</a>
+<h1>Hiển thị Feed trang chủ</h1>
+
+<div class="card">
+  <h2>Luồng tải Feed</h2>
+  <p>Admin thấy toàn bộ bài viết. User thường chỉ thấy bài bạn bè và bản thân theo visibility. Infinite scroll tự tải thêm khi cuộn xuống cuối.</p>
+  <div class="mermaid">
+flowchart TD
+    A["HomePage khởi động"] --> B["GET /api/posts/feed?page=1<br/>Kèm JWT trong header"]
+    B --> C["Đọc JWT: lấy userId và isAdmin"]
+    C --> D{"isAdmin = true"}
+    D -->|Co| E["GetAllPostsPagedAsync<br/>Không lọc gì - toàn bộ bài"]
+    D -->|Khong| F["GetFriendIdsAsync<br/>Lấy danh sách ID bạn bè"]
+    F --> G["GetFeedPagedAsync<br/>Bài của bạn bè và bản thân<br/>Lọc theo Visibility"]
+    E --> H["MapToDTO<br/>content, author, likeCount, hashtags"]
+    G --> H
+    H --> I["Trả PagedResult<br/>items + hasNext"]
+    I --> J["Render danh sách PostCard"]
+    J --> K["IntersectionObserver<br/>theo dõi div cuối trang"]
+    K --> L{"Scroll chạm cuối"}
+    L -->|Co| M{"hasMore = true"}
+    M -->|Co| N["Gọi GET feed?page tiếp theo"]
+    N --> O["Append bài mới vào danh sách"]
+    O --> K
+    M -->|Khong| P["Hiện: Đã tải hết bài viết"]
+    L -->|Khong| K
+
+    style E fill:#fff3e0,stroke:#e65100
+    style I fill:#e8fde8,stroke:#2e7d32
+    style P fill:#f5f5f5,stroke:#999
+  </div>
+</div>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+</body>
+</html>

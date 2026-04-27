@@ -1,22 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>InteractHub.API</RootNamespace>
+    <UserSecretsId>b0e94319-453f-45d3-9323-65715f05848b</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- ASP.NET Core Identity + EF Core -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"     Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"           Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools"               Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11" />
 
     <!-- JWT -->
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt"  Version="7.3.1" />
-    <PackageReference Include="Microsoft.IdentityModel.Tokens"    Version="7.3.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.3.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.3.1" />
 
     <!-- Swagger -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />

@@ -5,6 +5,8 @@ obj/
 .vs/
 appsettings.Development.json
 
+appsettings.*.json
+
 # Node
 node_modules/
 dist/
@@ -17,3 +19,5 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+workflows/

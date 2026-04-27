@@ -184,9 +184,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles(); // phục vụ wwwroot/uploads
 app.UseCors("ReactApp");
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+app.UseStaticFiles(); // phục vụ wwwroot/uploads
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
