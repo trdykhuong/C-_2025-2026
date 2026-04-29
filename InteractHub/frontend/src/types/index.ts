@@ -39,6 +39,7 @@ export interface Story {
 export interface Notification {
   id: number; message: string; type: string; isRead: boolean;
   createdAt: string; relatedPostId?: number;
+  actorId?: string; actorName?: string; actorAvatar?: string;
 }
 export interface PagedResult<T> {
   items: T[]; totalCount: number; page: number; pageSize: number; hasNext: boolean;

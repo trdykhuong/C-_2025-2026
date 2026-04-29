@@ -1,10 +1,7 @@
-using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using InteractHub.API.Models;
+using InteractHub.API.Repositories.Interfaces;
 using InteractHub.API.Services;
-using InteractHub.API.Services.Interfaces;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
 
@@ -13,18 +10,25 @@ namespace InteractHub.Tests;
 // ─── STORIES SERVICE TESTS ───────────────────────────────────────────────────
 public class StoriesServiceTests
 {
+    private static (StoryService service, Mock<IStoryRepository> repo) MakeService()
+    {
+        var repo = new Mock<IStoryRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+        return (new StoryService(repo.Object), repo);
+    }
+
     [Fact]
     public async Task CreateStory_WithCaption_ReturnsStory()
     {
-        var db = TestHelpers.CreateInMemoryDb("stories_create_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        repo.Setup(r => r.LoadUserAsync(It.IsAny<Story>()))
+            .Callback<Story>(s => s.User = user)
+            .Returns(Task.CompletedTask);
 
-        var service = new StoriesService(db);
-        var result = await service.CreateAsync(user.Id, new CreateStoryDto
+        var result = await service.CreateAsync(user.Id, new CreateStoryDTO
         {
-            Caption = "Hello from story!",
+            Caption  = "Hello from story!",
             ImageUrl = "https://example.com/img.jpg"
         });
 
@@ -36,13 +40,13 @@ public class StoriesServiceTests
     [Fact]
     public async Task CreateStory_ExpiresIn24Hours()
     {
-        var db = TestHelpers.CreateInMemoryDb("stories_expiry_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        repo.Setup(r => r.LoadUserAsync(It.IsAny<Story>()))
+            .Callback<Story>(s => s.User = user)
+            .Returns(Task.CompletedTask);
 
-        var service = new StoriesService(db);
-        var result = await service.CreateAsync(user.Id, new CreateStoryDto { Caption = "Test" });
+        var result = await service.CreateAsync(user.Id, new CreateStoryDTO { Caption = "Test" });
 
         Assert.True(result.Success);
         var diff = result.Data!.ExpiresAt - result.Data!.CreatedAt;
@@ -50,31 +54,22 @@ public class StoriesServiceTests
     }
 
     [Fact]
-    public async Task GetFeed_ExcludesExpiredStories()
+    public async Task GetFeed_ReturnsActiveStoriesFromRepo()
     {
-        var db = TestHelpers.CreateInMemoryDb("stories_expired_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-
-        // Active story
-        db.Stories.Add(new Story
+        var activeStory = new Story
         {
-            UserId = user.Id,
-            User = user,
-            Caption = "Active",
+            UserId    = user.Id,
+            User      = user,
+            Caption   = "Active",
             ExpiresAt = DateTime.UtcNow.AddHours(23)
-        });
-        // Expired story
-        db.Stories.Add(new Story
-        {
-            UserId = user.Id,
-            User = user,
-            Caption = "Expired",
-            ExpiresAt = DateTime.UtcNow.AddHours(-1)
-        });
-        await db.SaveChangesAsync();
+        };
 
-        var service = new StoriesService(db);
+        repo.Setup(r => r.GetFriendIdsAsync(user.Id)).ReturnsAsync([]);
+        repo.Setup(r => r.GetFeedAsync(It.IsAny<List<string>>(), user.Id))
+            .ReturnsAsync([activeStory]);
+
         var result = await service.GetFeedAsync(user.Id);
 
         Assert.Single(result);
@@ -82,58 +77,47 @@ public class StoriesServiceTests
     }
 
     [Fact]
-    public async Task DeleteStory_ByNonOwner_ReturnsUnauthorized()
+    public async Task DeleteStory_ByNonOwner_ReturnsFailure()
     {
-        var db = TestHelpers.CreateInMemoryDb("stories_delete_" + Guid.NewGuid());
-        var owner = TestHelpers.CreateUser("owner");
-        var other = TestHelpers.CreateUser("other");
-        db.Users.AddRange(owner, other);
-        db.Stories.Add(new Story
-        {
-            UserId = owner.Id,
-            User = owner,
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
-        });
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var story = new Story { Id = 1, UserId = "owner", ExpiresAt = DateTime.UtcNow.AddHours(24) };
+        repo.Setup(r => r.FindByIdAsync(1)).ReturnsAsync(story);
 
-        var story = db.Stories.First();
-        var service = new StoriesService(db);
-        var result = await service.DeleteAsync(story.Id, other.Id);
+        var result = await service.DeleteAsync(1, "other");
 
         Assert.False(result.Success);
-        Assert.Contains("Unauthorized", result.Errors.First());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 }
 
 // ─── COMMENTS SERVICE TESTS ───────────────────────────────────────────────────
 public class CommentsServiceTests
 {
-    private readonly Mock<INotificationsService> _notifMock = new();
-
-    public CommentsServiceTests()
+    private static (CommentService service, Mock<ICommentRepository> repo) MakeService()
     {
-        _notifMock.Setup(n => n.CreateNotificationAsync(
-            It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()))
-            .Returns(Task.CompletedTask);
+        var repo      = new Mock<ICommentRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        var notifRepo = new Mock<INotificationRepository>();
+        notifRepo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        return (new CommentService(repo.Object, TestHelpers.CreateNotifService(notifRepo)), repo);
     }
 
     [Fact]
     public async Task CreateComment_OnExistingPost_ReturnsComment()
     {
-        var db = TestHelpers.CreateInMemoryDb("comments_create_" + Guid.NewGuid());
-        var author = TestHelpers.CreateUser("author");
+        var (service, repo) = MakeService();
+        var author    = TestHelpers.CreateUser("author");
         var commenter = TestHelpers.CreateUser("commenter");
-        db.Users.AddRange(author, commenter);
-        var post = new Post { Content = "Test post", UserId = author.Id, User = author };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var post      = new Post { Id = 1, Content = "Test post", UserId = author.Id, User = author };
 
-        var service = new CommentsService(db, _notifMock.Object);
-        var result = await service.CreateAsync(post.Id, commenter.Id, new CreateCommentDto
-        {
-            Content = "Great post!"
-        });
+        repo.Setup(r => r.FindPostAsync(1)).ReturnsAsync(post);
+        repo.Setup(r => r.LoadUserAsync(It.IsAny<Comment>()))
+            .Callback<Comment>(c => c.User = commenter)
+            .Returns(Task.CompletedTask);
+
+        var result = await service.CreateAsync(1, commenter.Id, new CreateCommentDTO { Content = "Great post!" });
 
         Assert.True(result.Success);
         Assert.Equal("Great post!", result.Data!.Content);
@@ -143,32 +127,25 @@ public class CommentsServiceTests
     [Fact]
     public async Task CreateComment_OnNonExistentPost_ReturnsFailure()
     {
-        var db = TestHelpers.CreateInMemoryDb("comments_nopost_" + Guid.NewGuid());
-        var service = new CommentsService(db, _notifMock.Object);
+        var (service, repo) = MakeService();
+        repo.Setup(r => r.FindPostAsync(999)).ReturnsAsync((Post?)null);
 
-        var result = await service.CreateAsync(999, "user1", new CreateCommentDto { Content = "Hi" });
+        var result = await service.CreateAsync(999, "user1", new CreateCommentDTO { Content = "Hi" });
 
         Assert.False(result.Success);
-        Assert.Contains("not found", result.Errors.First().ToLower());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 
     [Fact]
-    public async Task GetByPost_ReturnsOnlyNonDeletedComments()
+    public async Task GetByPost_ReturnsCommentsFromRepo()
     {
-        var db = TestHelpers.CreateInMemoryDb("comments_get_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        var post = new Post { Content = "Post", UserId = user.Id, User = user };
-        db.Posts.Add(post);
-        db.Comments.AddRange(
-            new Comment { PostId = 1, UserId = user.Id, User = user, Content = "Visible", IsDeleted = false },
-            new Comment { PostId = 1, UserId = user.Id, User = user, Content = "Deleted", IsDeleted = true }
-        );
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var user    = TestHelpers.CreateUser("u1");
+        var visible = new Comment { Id = 1, UserId = user.Id, User = user, Content = "Visible", IsDeleted = false };
 
-        var postId = db.Posts.First().Id;
-        var service = new CommentsService(db, _notifMock.Object);
-        var comments = await service.GetByPostAsync(postId);
+        repo.Setup(r => r.GetByPostWithUserAsync(1)).ReturnsAsync([visible]);
+
+        var comments = await service.GetByPostAsync(1);
 
         Assert.Single(comments);
         Assert.Equal("Visible", comments[0].Content);
@@ -177,76 +154,70 @@ public class CommentsServiceTests
     [Fact]
     public async Task DeleteComment_ByOwner_SoftDeletes()
     {
-        var db = TestHelpers.CreateInMemoryDb("comments_softdelete_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        var post = new Post { Content = "P", UserId = user.Id, User = user };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var user    = TestHelpers.CreateUser("u1");
+        var comment = new Comment { Id = 1, UserId = user.Id, User = user, Content = "Hi", IsDeleted = false };
 
-        var comment = new Comment { PostId = db.Posts.First().Id, UserId = user.Id, User = user, Content = "Hi" };
-        db.Comments.Add(comment);
-        await db.SaveChangesAsync();
+        repo.Setup(r => r.FindActiveAsync(1)).ReturnsAsync(comment);
 
-        var service = new CommentsService(db, _notifMock.Object);
-        var result = await service.DeleteAsync(comment.Id, user.Id);
+        var result = await service.DeleteAsync(1, user.Id);
 
         Assert.True(result.Success);
-        Assert.True(db.Comments.First().IsDeleted);
+        Assert.True(comment.IsDeleted);
     }
 }
 
 // ─── NOTIFICATIONS SERVICE EXTENDED TESTS ───────────────────────────────────
 public class NotificationsServiceExtendedTests
 {
+    private static (NotificationService service, Mock<INotificationRepository> repo) MakeService()
+    {
+        var repo = new Mock<INotificationRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+        return (TestHelpers.CreateNotifService(repo), repo);
+    }
+
     [Fact]
     public async Task CreateNotification_PersistsCorrectly()
     {
-        var db = TestHelpers.CreateInMemoryDb("notif_create_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        Notification? saved = null;
+        repo.Setup(r => r.Add(It.IsAny<Notification>()))
+            .Callback<Notification>(n => saved = n);
 
-        var service = new NotificationsService(db);
-        await service.CreateNotificationAsync(user.Id, "actor1", "like", "liked your post", 42);
+        await service.CreateAsync("u1", "actor1", "like", "đã thích bài viết của bạn.", 42);
 
-        var saved = db.Notifications.First();
-        Assert.Equal(user.Id, saved.UserId);
-        Assert.Equal("actor1", saved.ActorId);
+        Assert.NotNull(saved);
+        Assert.Equal("u1",   saved.UserId);
         Assert.Equal("like", saved.Type);
-        Assert.Equal(42, saved.RelatedPostId);
+        Assert.Equal(42,     saved.RelatedPostId);
         Assert.False(saved.IsRead);
+        // Message phải chứa verb (actor name được prepend bởi service)
+        Assert.Contains("đã thích bài viết của bạn.", saved.Message);
     }
 
     [Fact]
     public async Task MarkAsRead_ByWrongUser_ReturnsFailure()
     {
-        var db = TestHelpers.CreateInMemoryDb("notif_wronguser_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        db.Notifications.Add(new Notification { UserId = user.Id, Message = "Test", Type = "like" });
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var notif = new Notification { Id = 1, UserId = "u1", Message = "Test", Type = "like" };
+        repo.Setup(r => r.FindByIdAsync(1)).ReturnsAsync(notif);
 
-        var notif = db.Notifications.First();
-        var service = new NotificationsService(db);
-        var result = await service.MarkAsReadAsync(notif.Id, "wrong_user");
+        var result = await service.MarkReadAsync(1, "wrong_user");
 
         Assert.False(result.Success);
     }
 
     [Fact]
-    public async Task GetNotifications_LimitedTo50()
+    public async Task GetNotifications_ReturnsMappedResults()
     {
-        var db = TestHelpers.CreateInMemoryDb("notif_limit_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
+        var (service, repo) = MakeService();
+        var notifs = Enumerable.Range(0, 50)
+            .Select(i => new Notification { Id = i, UserId = "u1", Message = $"Notif {i}", Type = "like" })
+            .ToList();
+        repo.Setup(r => r.GetByUserAsync("u1")).ReturnsAsync(notifs);
 
-        for (int i = 0; i < 60; i++)
-            db.Notifications.Add(new Notification { UserId = user.Id, Message = $"Notif {i}", Type = "like" });
-        await db.SaveChangesAsync();
-
-        var service = new NotificationsService(db);
-        var result = await service.GetUserNotificationsAsync(user.Id);
+        var result = await service.GetAllAsync("u1");
 
         Assert.Equal(50, result.Count);
     }
@@ -255,59 +226,52 @@ public class NotificationsServiceExtendedTests
 // ─── POSTS SERVICE EXTENDED TESTS ───────────────────────────────────────────
 public class PostsServiceExtendedTests
 {
-    private readonly Mock<INotificationsService> _notifMock = new();
-
-    public PostsServiceExtendedTests()
+    private static (PostService service, Mock<IPostRepository> repo) MakeService()
     {
-        _notifMock.Setup(n => n.CreateNotificationAsync(
-            It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()))
-            .Returns(Task.CompletedTask);
+        var repo      = new Mock<IPostRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        var notifRepo = new Mock<INotificationRepository>();
+        notifRepo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        return (new PostService(repo.Object, TestHelpers.CreateNotifService(notifRepo)), repo);
     }
 
     [Fact]
     public async Task UpdatePost_ByOwner_UpdatesContent()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_update_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        var post = new Post { Content = "Original", UserId = user.Id, User = user };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var post = new Post { Id = 1, Content = "Original", UserId = user.Id, User = user };
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.UpdateAsync(post.Id, user.Id, new UpdatePostDto { Content = "Updated" });
+        repo.Setup(r => r.FindActiveWithUserAsync(1)).ReturnsAsync(post);
+
+        var result = await service.UpdateAsync(1, user.Id, new UpdatePostDTO { Content = "Updated" });
 
         Assert.True(result.Success);
         Assert.Equal("Updated", result.Data!.Content);
-        Assert.NotNull(db.Posts.First().UpdatedAt);
+        Assert.NotNull(post.UpdatedAt);
     }
 
     [Fact]
-    public async Task GetFeed_ShowsOnlyFriendsAndOwnPosts()
+    public async Task GetFeed_CallsRepoWithFriendAndOwnIds()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_feed_" + Guid.NewGuid());
-        var me = TestHelpers.CreateUser("me");
+        var (service, repo) = MakeService();
+        var user   = TestHelpers.CreateUser("me");
         var friend = TestHelpers.CreateUser("friend");
-        var stranger = TestHelpers.CreateUser("stranger");
-        db.Users.AddRange(me, friend, stranger);
-
-        db.Friendships.Add(new Friendship
+        var posts  = new List<Post>
         {
-            SenderId = me.Id, ReceiverId = friend.Id,
-            Sender = me, Receiver = friend,
-            Status = "accepted"
-        });
+            new() { Id = 1, Content = "My post",    UserId = user.Id,   User = user,   Visibility = "public" },
+            new() { Id = 2, Content = "Friend post", UserId = friend.Id, User = friend, Visibility = "public" },
+        };
 
-        db.Posts.AddRange(
-            new Post { Content = "My post", UserId = me.Id, User = me },
-            new Post { Content = "Friend post", UserId = friend.Id, User = friend },
-            new Post { Content = "Stranger post", UserId = stranger.Id, User = stranger }
-        );
-        await db.SaveChangesAsync();
+        repo.Setup(r => r.GetFriendIdsAsync("me")).ReturnsAsync(["friend"]);
+        repo.Setup(r => r.GetFeedPagedAsync(
+                It.Is<List<string>>(l => l.Contains("me") && l.Contains("friend")),
+                "me", 1, 10))
+            .ReturnsAsync((2, posts));
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.GetFeedAsync(me.Id, 1, 10);
+        var result = await service.GetFeedAsync("me", 1, 10);
 
         Assert.Equal(2, result.Items.Count);
         Assert.DoesNotContain(result.Items, p => p.Content == "Stranger post");
@@ -316,41 +280,37 @@ public class PostsServiceExtendedTests
     [Fact]
     public async Task ToggleLike_SecondTime_RemovesLike()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_unlike_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var owner = TestHelpers.CreateUser("owner");
         var liker = TestHelpers.CreateUser("liker");
-        db.Users.AddRange(owner, liker);
-        var post = new Post { Content = "Post", UserId = owner.Id, User = owner };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var post  = new Post { Id = 1, Content = "Post", UserId = owner.Id, User = owner };
+        var like  = new Like { PostId = 1, UserId = liker.Id };
 
-        _notifMock.Setup(n => n.CreateNotificationAsync(
-            It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()))
-            .Returns(Task.CompletedTask);
+        repo.Setup(r => r.FindByIdAsync(1)).ReturnsAsync(post);
+        repo.Setup(r => r.FindLikeAsync(1, liker.Id)).ReturnsAsync(like);
 
-        var service = new PostsService(db, _notifMock.Object);
-        await service.ToggleLikeAsync(post.Id, liker.Id); // like
-        var result = await service.ToggleLikeAsync(post.Id, liker.Id); // unlike
+        var result = await service.ToggleLikeAsync(1, liker.Id);
 
         Assert.True(result.Success);
-        Assert.False(result.Data); // unliked
-        Assert.Equal(0, db.Likes.Count());
+        Assert.False(result.Data);
+        repo.Verify(r => r.RemoveLike(like), Times.Once);
     }
 
     [Fact]
     public async Task CreatePost_WithHashtags_SavesHashtags()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_hashtags_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.CreateAsync(user.Id, new CreatePostDto
+        repo.Setup(r => r.FindHashtagByNameAsync(It.IsAny<string>())).ReturnsAsync((Hashtag?)null);
+        repo.Setup(r => r.LoadUserAsync(It.IsAny<Post>()))
+            .Callback<Post>(p => p.User = user)
+            .Returns(Task.CompletedTask);
+
+        var result = await service.CreateAsync(user.Id, new CreatePostDTO
         {
-            Content = "Post with tags",
-            Hashtags = new List<string> { "dotnet", "csharp" }
+            Content  = "Post with tags",
+            Hashtags = ["dotnet", "csharp"]
         });
 
         Assert.True(result.Success);

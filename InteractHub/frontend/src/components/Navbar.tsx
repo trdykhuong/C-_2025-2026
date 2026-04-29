@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Home, Users, Bell, Search, ChevronDown, LogOut, User, Menu, X, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationsApi, usersApi } from '../services/api';
+import { createNotificationConnection } from '../services/signalr';
 import type { Notification, UserSummary } from '../types';
 import { Avatar } from './ui/Avatar';
 
@@ -10,17 +11,17 @@ const Navbar: React.FC = () => {
   const { user, logout }  = useAuth();
   const navigate           = useNavigate();
   const location           = useLocation();
-  const [searchVal, setSearchVal]       = useState('');
+  const [searchVal, setSearchVal]         = useState('');
   const [searchResults, setSearchResults] = useState<UserSummary[]>([]);
-  const [notifs, setNotifs]             = useState<Notification[]>([]);
-  const [unread, setUnread]             = useState(0);
-  const [showNotifs, setShowNotifs]     = useState(false);
-  const [showProfile, setShowProfile]   = useState(false);
-  const [showSearch, setShowSearch]     = useState(false);
-  const [mobileMenu, setMobileMenu]     = useState(false);
-  const searchTimer                     = useRef<number>();
+  const [notifs, setNotifs]               = useState<Notification[]>([]);
+  const [unread, setUnread]               = useState(0);
+  const [showNotifs, setShowNotifs]       = useState(false);
+  const [showProfile, setShowProfile]     = useState(false);
+  const [showSearch, setShowSearch]       = useState(false);
+  const [mobileMenu, setMobileMenu]       = useState(false);
+  const searchTimer                       = useRef<number>();
 
-  // Load notifications
+  // ── Load thông báo ban đầu ────────────────────────────────────────────────
   useEffect(() => {
     notificationsApi.getAll().then(r => {
       setNotifs(r.data ?? []);
@@ -28,7 +29,23 @@ const Navbar: React.FC = () => {
     });
   }, []);
 
-  // Debounce search
+  // ── Kết nối SignalR để nhận thông báo real-time ───────────────────────────
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const conn = createNotificationConnection(user.token);
+
+    conn.on('ReceiveNotification', (notif: Notification) => {
+      setNotifs(prev => [notif, ...prev]);
+      setUnread(prev => prev + 1);
+    });
+
+    conn.start().catch(() => {/* kết nối thất bại (offline, token hết hạn) – bỏ qua */});
+
+    return () => { conn.stop(); };
+  }, [user?.token]);
+
+  // ── Debounce search ───────────────────────────────────────────────────────
   useEffect(() => {
     clearTimeout(searchTimer.current);
     if (!searchVal.trim()) { setSearchResults([]); return; }
@@ -39,6 +56,16 @@ const Navbar: React.FC = () => {
   }, [searchVal]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+
+  const handleOpenNotifs = () => {
+    setShowNotifs(v => !v);
+    setShowProfile(false);
+    if (!showNotifs) {
+      notificationsApi.markAllRead();
+      setUnread(0);
+      setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+    }
+  };
 
   const navLinks = [
     { to: '/',        icon: Home,  label: 'Trang chủ' },
@@ -91,7 +118,7 @@ const Navbar: React.FC = () => {
 
         {/* Nav icons (desktop) */}
         <div className="hidden md:flex flex-1 justify-center gap-1">
-          {navLinks.map(({ to, icon: Icon, label }) => (
+          {navLinks.map(({ to, icon: Icon }) => (
             <Link key={to} to={to}
               className={`flex flex-col items-center justify-center w-28 h-12 rounded-xl transition text-sm gap-0.5
                 ${location.pathname === to
@@ -105,10 +132,11 @@ const Navbar: React.FC = () => {
 
         {/* Right section */}
         <div className="ml-auto flex items-center gap-2">
+
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => { setShowNotifs(v => !v); setShowProfile(false); if (!showNotifs) { notificationsApi.markAllRead(); setUnread(0); } }}
+              onClick={handleOpenNotifs}
               className="relative w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-800"
             >
               <Bell size={20} />
@@ -118,6 +146,7 @@ const Navbar: React.FC = () => {
                 </span>
               )}
             </button>
+
             {showNotifs && (
               <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 font-bold text-lg border-b">Thông báo</div>
@@ -125,9 +154,24 @@ const Navbar: React.FC = () => {
                   {notifs.length === 0
                     ? <p className="text-center text-gray-400 py-8 text-sm">Không có thông báo</p>
                     : notifs.map(n => (
-                        <div key={n.id} className={`px-4 py-3 border-b hover:bg-gray-50 ${!n.isRead ? 'bg-blue-50' : ''}`}>
-                          <p className="text-sm">{n.message}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{new Date(n.createdAt).toLocaleString('vi-VN')}</p>
+                        <div
+                          key={n.id}
+                          className={`flex items-start gap-3 px-4 py-3 border-b hover:bg-gray-50 ${!n.isRead ? 'bg-blue-50' : ''}`}
+                        >
+                          {/* Avatar của người gây ra hành động */}
+                          <div className="shrink-0 mt-0.5">
+                            <Avatar name={n.actorName ?? '?'} src={n.actorAvatar} size={36} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm leading-snug">{n.message}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(n.createdAt).toLocaleString('vi-VN')}
+                            </p>
+                          </div>
+                          {/* Chấm xanh nếu chưa đọc */}
+                          {!n.isRead && (
+                            <span className="shrink-0 mt-1.5 w-2.5 h-2.5 rounded-full bg-[#1877f2]" />
+                          )}
                         </div>
                       ))}
                 </div>

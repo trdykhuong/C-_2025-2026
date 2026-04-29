@@ -15,6 +15,7 @@ public class NotificationRepository : INotificationRepository
     public async Task<List<Notification>> GetByUserAsync(string userId)
         => await _db.Notifications
             .Where(n => n.UserId == userId)
+            .Include(n => n.Actor)
             .OrderByDescending(n => n.CreatedAt)
             .Take(50)
             .ToListAsync();

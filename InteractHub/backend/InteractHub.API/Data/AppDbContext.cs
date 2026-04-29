@@ -73,6 +73,14 @@ public class AppDbContext : IdentityDbContext<AppUser>
         builder.Entity<Hashtag>()
             .HasIndex(h => h.Name).IsUnique();
 
+        // Notification.Actor FK – Restrict để tránh multiple cascade paths
+        builder.Entity<Notification>()
+            .HasOne(n => n.Actor)
+            .WithMany()
+            .HasForeignKey(n => n.ActorId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Seed roles
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityRole>().HasData(
             new Microsoft.AspNetCore.Identity.IdentityRole

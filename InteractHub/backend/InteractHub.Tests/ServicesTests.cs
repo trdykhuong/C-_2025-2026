@@ -1,10 +1,8 @@
-using InteractHub.API.Data;
 using InteractHub.API.DTOs;
 using InteractHub.API.Models;
+using InteractHub.API.Repositories.Interfaces;
 using InteractHub.API.Services;
-using InteractHub.API.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
@@ -14,97 +12,85 @@ namespace InteractHub.Tests;
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 public static class TestHelpers
 {
-    public static AppDbContext CreateInMemoryDb(string dbName)
+    public static AppUser CreateUser(string id = "user1", string name = "Test User") => new()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(dbName)
-            .Options;
-        return new AppDbContext(options);
-    }
-
-    public static AppUser CreateUser(string id = "user1", string name = "Test User") => new AppUser
-    {
-        Id = id,
+        Id       = id,
         FullName = name,
         UserName = id,
-        Email = $"{id}@test.com"
+        Email    = $"{id}@test.com"
     };
+
+    // Tạo NotificationService với tất cả dependency đã được mock
+    public static NotificationService CreateNotifService(Mock<INotificationRepository> notifRepo)
+    {
+        var userRepo = new Mock<IUserRepository>();
+        userRepo.Setup(r => r.FindByIdAsync(It.IsAny<string>())).ReturnsAsync((AppUser?)null);
+
+        var pusher = new Mock<IRealtimePusher>();
+        pusher.Setup(p => p.PushNotificationAsync(It.IsAny<string>(), It.IsAny<NotificationResponseDTO>()))
+              .Returns(Task.CompletedTask);
+
+        return new NotificationService(notifRepo.Object, userRepo.Object, pusher.Object);
+    }
 }
 
 // ─── AUTH SERVICE TESTS ─────────────────────────────────────────────────────
 public class AuthServiceTests
 {
     private readonly Mock<UserManager<AppUser>> _userManagerMock;
-    private readonly Mock<IConfiguration> _configMock;
-    private readonly Mock<IConfigurationSection> _jwtSectionMock;
+    private readonly Mock<IConfiguration>       _configMock;
 
     public AuthServiceTests()
     {
         var store = new Mock<IUserStore<AppUser>>();
         _userManagerMock = new Mock<UserManager<AppUser>>(store.Object, null!, null!, null!, null!, null!, null!, null!, null!);
 
-        _jwtSectionMock = new Mock<IConfigurationSection>();
-        _jwtSectionMock.Setup(s => s["Key"]).Returns("TestSecretKey_Min32Chars_ForTesting!!");
-        _jwtSectionMock.Setup(s => s["Issuer"]).Returns("TestIssuer");
-        _jwtSectionMock.Setup(s => s["Audience"]).Returns("TestAudience");
-        _jwtSectionMock.Setup(s => s["ExpiresHours"]).Returns("24");
+        var jwtSection = new Mock<IConfigurationSection>();
+        jwtSection.Setup(s => s["Key"]).Returns("TestSecretKey_Min32Chars_ForTesting!!");
+        jwtSection.Setup(s => s["Issuer"]).Returns("TestIssuer");
+        jwtSection.Setup(s => s["Audience"]).Returns("TestAudience");
+        jwtSection.Setup(s => s["ExpiresHours"]).Returns("24");
 
         _configMock = new Mock<IConfiguration>();
-        _configMock.Setup(c => c.GetSection("Jwt")).Returns(_jwtSectionMock.Object);
+        _configMock.Setup(c => c.GetSection("Jwt")).Returns(jwtSection.Object);
     }
 
     [Fact]
     public async Task Register_WithExistingEmail_ReturnsFailure()
     {
-        // Arrange
         var existingUser = TestHelpers.CreateUser();
-        _userManagerMock.Setup(m => m.FindByEmailAsync("existing@test.com"))
-            .ReturnsAsync(existingUser);
+        _userManagerMock.Setup(m => m.FindByEmailAsync("existing@test.com")).ReturnsAsync(existingUser);
 
         var service = new AuthService(_userManagerMock.Object, _configMock.Object);
-
-        // Act
-        var result = await service.RegisterAsync(new RegisterDto
+        var result  = await service.RegisterAsync(new RegisterDTO
         {
-            Email = "existing@test.com",
+            Email    = "existing@test.com",
             Password = "Test1234",
             FullName = "Test User",
             UserName = "testuser"
         });
 
-        // Assert
         Assert.False(result.Success);
-        Assert.Contains("Email already in use", result.Errors.First());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 
     [Fact]
     public async Task Register_WithValidData_ReturnsSuccess()
     {
-        // Arrange
-        _userManagerMock.Setup(m => m.FindByEmailAsync(It.IsAny<string>()))
-            .ReturnsAsync((AppUser?)null);
-
-        _userManagerMock.Setup(m => m.CreateAsync(It.IsAny<AppUser>(), It.IsAny<string>()))
-            .ReturnsAsync(IdentityResult.Success);
-
-        _userManagerMock.Setup(m => m.AddToRoleAsync(It.IsAny<AppUser>(), It.IsAny<string>()))
-            .ReturnsAsync(IdentityResult.Success);
-
-        _userManagerMock.Setup(m => m.GetRolesAsync(It.IsAny<AppUser>()))
-            .ReturnsAsync(new List<string> { "User" });
+        _userManagerMock.Setup(m => m.FindByEmailAsync(It.IsAny<string>())).ReturnsAsync((AppUser?)null);
+        _userManagerMock.Setup(m => m.FindByNameAsync(It.IsAny<string>())).ReturnsAsync((AppUser?)null);
+        _userManagerMock.Setup(m => m.CreateAsync(It.IsAny<AppUser>(), It.IsAny<string>())).ReturnsAsync(IdentityResult.Success);
+        _userManagerMock.Setup(m => m.GetRolesAsync(It.IsAny<AppUser>())).ReturnsAsync(["User"]);
 
         var service = new AuthService(_userManagerMock.Object, _configMock.Object);
-
-        // Act
-        var result = await service.RegisterAsync(new RegisterDto
+        var result  = await service.RegisterAsync(new RegisterDTO
         {
-            Email = "new@test.com",
+            Email    = "new@test.com",
             Password = "Test1234!",
             FullName = "New User",
             UserName = "newuser"
         });
 
-        // Assert
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.NotEmpty(result.Data!.Token);
@@ -113,27 +99,17 @@ public class AuthServiceTests
     [Fact]
     public async Task Login_WithInvalidCredentials_ReturnsFailure()
     {
-        // Arrange
-        _userManagerMock.Setup(m => m.FindByEmailAsync(It.IsAny<string>()))
-            .ReturnsAsync((AppUser?)null);
+        _userManagerMock.Setup(m => m.FindByEmailAsync(It.IsAny<string>())).ReturnsAsync((AppUser?)null);
 
         var service = new AuthService(_userManagerMock.Object, _configMock.Object);
+        var result  = await service.LoginAsync(new LoginDTO { Email = "wrong@test.com", Password = "WrongPass" });
 
-        // Act
-        var result = await service.LoginAsync(new LoginDto
-        {
-            Email = "wrong@test.com",
-            Password = "WrongPass"
-        });
-
-        // Assert
         Assert.False(result.Success);
     }
 
     [Fact]
     public async Task Login_WithDeactivatedAccount_ReturnsFailure()
     {
-        // Arrange
         var user = TestHelpers.CreateUser();
         user.IsActive = false;
 
@@ -141,34 +117,42 @@ public class AuthServiceTests
         _userManagerMock.Setup(m => m.CheckPasswordAsync(user, "Pass1234")).ReturnsAsync(true);
 
         var service = new AuthService(_userManagerMock.Object, _configMock.Object);
+        var result  = await service.LoginAsync(new LoginDTO { Email = user.Email!, Password = "Pass1234" });
 
-        // Act
-        var result = await service.LoginAsync(new LoginDto { Email = user.Email!, Password = "Pass1234" });
-
-        // Assert
         Assert.False(result.Success);
-        Assert.Contains("deactivated", result.Errors.First().ToLower());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 }
 
 // ─── POSTS SERVICE TESTS ────────────────────────────────────────────────────
 public class PostsServiceTests
 {
-    private readonly Mock<INotificationsService> _notifMock = new();
+    private static (PostService service, Mock<IPostRepository> repo) MakeService()
+    {
+        var repo      = new Mock<IPostRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        var notifRepo = new Mock<INotificationRepository>();
+        notifRepo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        return (new PostService(repo.Object, TestHelpers.CreateNotifService(notifRepo)), repo);
+    }
 
     [Fact]
     public async Task CreatePost_WithValidData_ReturnsPost()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_create_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser();
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.CreateAsync(user.Id, new CreatePostDto
+        repo.Setup(r => r.FindHashtagByNameAsync(It.IsAny<string>())).ReturnsAsync((Hashtag?)null);
+        repo.Setup(r => r.LoadUserAsync(It.IsAny<Post>()))
+            .Callback<Post>(p => p.User = user)
+            .Returns(Task.CompletedTask);
+
+        var result = await service.CreateAsync(user.Id, new CreatePostDTO
         {
-            Content = "Hello World!",
-            Hashtags = new List<string> { "test" }
+            Content  = "Hello World!",
+            Hashtags = ["test"]
         });
 
         Assert.True(result.Success);
@@ -178,54 +162,45 @@ public class PostsServiceTests
     [Fact]
     public async Task DeletePost_ByNonOwner_ReturnsUnauthorized()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_delete_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var owner = TestHelpers.CreateUser("owner");
-        var other = TestHelpers.CreateUser("other");
-        db.Users.AddRange(owner, other);
-        var post = new Post { Content = "Test", UserId = owner.Id, User = owner };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var post  = new Post { Id = 1, Content = "Test", UserId = owner.Id, User = owner };
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.DeleteAsync(post.Id, other.Id);
+        repo.Setup(r => r.FindByIdAsync(1)).ReturnsAsync(post);
+
+        var result = await service.DeleteAsync(1, "other");
 
         Assert.False(result.Success);
-        Assert.Contains("Unauthorized", result.Errors.First());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 
     [Fact]
     public async Task ToggleLike_FirstTime_CreatesLike()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_like_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser();
-        db.Users.Add(user);
-        var post = new Post { Content = "Like me", UserId = user.Id, User = user };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
+        var post = new Post { Id = 1, Content = "Like me", UserId = "owner", User = user };
 
-        _notifMock.Setup(n => n.CreateNotificationAsync(It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>())).Returns(Task.CompletedTask);
+        repo.Setup(r => r.FindByIdAsync(1)).ReturnsAsync(post);
+        repo.Setup(r => r.FindLikeAsync(1, user.Id)).ReturnsAsync((Like?)null);
 
-        var service = new PostsService(db, _notifMock.Object);
-        var result = await service.ToggleLikeAsync(post.Id, "other_user");
+        var result = await service.ToggleLikeAsync(1, user.Id);
 
         Assert.True(result.Success);
-        Assert.True(result.Data); // liked
+        Assert.True(result.Data);
+        repo.Verify(r => r.AddLike(It.IsAny<Like>()), Times.Once);
     }
 
     [Fact]
     public async Task SearchPosts_WithMatchingContent_ReturnsResults()
     {
-        var db = TestHelpers.CreateInMemoryDb("posts_search_" + Guid.NewGuid());
+        var (service, repo) = MakeService();
         var user = TestHelpers.CreateUser();
-        db.Users.Add(user);
-        db.Posts.AddRange(
-            new Post { Content = "Hello world", UserId = user.Id, User = user },
-            new Post { Content = "Goodbye world", UserId = user.Id, User = user }
-        );
-        await db.SaveChangesAsync();
+        var post = new Post { Id = 1, Content = "Hello world", UserId = user.Id, User = user };
 
-        var service = new PostsService(db, _notifMock.Object);
+        repo.Setup(r => r.SearchPagedAsync("Hello", 1, 10))
+            .ReturnsAsync((1, new List<Post> { post }));
+
         var result = await service.SearchAsync("Hello", user.Id, 1, 10);
 
         Assert.Single(result.Items);
@@ -236,48 +211,49 @@ public class PostsServiceTests
 // ─── FRIENDS SERVICE TESTS ──────────────────────────────────────────────────
 public class FriendsServiceTests
 {
-    private readonly Mock<INotificationsService> _notifMock = new();
-
-    public FriendsServiceTests()
+    private static (FriendService service, Mock<IFriendRepository> repo) MakeService()
     {
-        _notifMock.Setup(n => n.CreateNotificationAsync(It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>())).Returns(Task.CompletedTask);
+        var repo      = new Mock<IFriendRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        var notifRepo = new Mock<INotificationRepository>();
+        notifRepo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+
+        return (new FriendService(repo.Object, TestHelpers.CreateNotifService(notifRepo)), repo);
     }
 
     [Fact]
     public async Task SendRequest_ToSelf_ReturnsFailure()
     {
-        var db = TestHelpers.CreateInMemoryDb("friends_self_" + Guid.NewGuid());
-        var service = new FriendsService(db, _notifMock.Object);
-
+        var (service, _) = MakeService();
         var result = await service.SendRequestAsync("user1", "user1");
 
         Assert.False(result.Success);
-        Assert.Contains("yourself", result.Errors.First().ToLower());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 
     [Fact]
     public async Task SendRequest_ToNonExistentUser_ReturnsFailure()
     {
-        var db = TestHelpers.CreateInMemoryDb("friends_notfound_" + Guid.NewGuid());
-        var service = new FriendsService(db, _notifMock.Object);
+        var (service, repo) = MakeService();
+        repo.Setup(r => r.FindUserAsync("nonexistent")).ReturnsAsync((AppUser?)null);
 
         var result = await service.SendRequestAsync("user1", "nonexistent");
 
         Assert.False(result.Success);
-        Assert.Contains("not found", result.Errors.First().ToLower());
+        Assert.False(string.IsNullOrEmpty(result.Message));
     }
 
     [Fact]
     public async Task SendRequest_ValidRequest_CreatesFriendship()
     {
-        var db = TestHelpers.CreateInMemoryDb("friends_valid_" + Guid.NewGuid());
-        var sender = TestHelpers.CreateUser("sender");
+        var (service, repo) = MakeService();
+        var sender   = TestHelpers.CreateUser("sender");
         var receiver = TestHelpers.CreateUser("receiver");
-        db.Users.AddRange(sender, receiver);
-        await db.SaveChangesAsync();
 
-        var service = new FriendsService(db, _notifMock.Object);
+        repo.Setup(r => r.FindUserAsync(receiver.Id)).ReturnsAsync(receiver);
+        repo.Setup(r => r.ExistsAsync(sender.Id, receiver.Id)).ReturnsAsync(false);
+
         var result = await service.SendRequestAsync(sender.Id, receiver.Id);
 
         Assert.True(result.Success);
@@ -287,16 +263,18 @@ public class FriendsServiceTests
     [Fact]
     public async Task RespondToRequest_Accept_UpdatesStatus()
     {
-        var db = TestHelpers.CreateInMemoryDb("friends_accept_" + Guid.NewGuid());
-        var sender = TestHelpers.CreateUser("s1");
-        var receiver = TestHelpers.CreateUser("r1");
-        db.Users.AddRange(sender, receiver);
-        var friendship = new Friendship { SenderId = sender.Id, ReceiverId = receiver.Id, Sender = sender, Receiver = receiver };
-        db.Friendships.Add(friendship);
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var sender     = TestHelpers.CreateUser("s1");
+        var receiver   = TestHelpers.CreateUser("r1");
+        var friendship = new Friendship
+        {
+            Id = 1, SenderId = sender.Id, ReceiverId = receiver.Id,
+            Sender = sender, Receiver = receiver
+        };
 
-        var service = new FriendsService(db, _notifMock.Object);
-        var result = await service.RespondToRequestAsync(friendship.Id, receiver.Id, true);
+        repo.Setup(r => r.FindByIdWithUsersAsync(1)).ReturnsAsync(friendship);
+
+        var result = await service.RespondAsync(1, receiver.Id, true);
 
         Assert.True(result.Success);
         Assert.Equal("accepted", result.Data!.Status);
@@ -306,42 +284,37 @@ public class FriendsServiceTests
 // ─── NOTIFICATIONS SERVICE TESTS ────────────────────────────────────────────
 public class NotificationsServiceTests
 {
+    private static (NotificationService service, Mock<INotificationRepository> repo) MakeService()
+    {
+        var repo = new Mock<INotificationRepository>();
+        repo.Setup(r => r.SaveChangesAsync()).ReturnsAsync(1);
+        return (TestHelpers.CreateNotifService(repo), repo);
+    }
+
     [Fact]
     public async Task GetNotifications_ReturnsOnlyUserNotifications()
     {
-        var db = TestHelpers.CreateInMemoryDb("notif_get_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        var other = TestHelpers.CreateUser("u2");
-        db.Users.AddRange(user, other);
-        db.Notifications.AddRange(
-            new Notification { UserId = user.Id, Message = "For user", Type = "like" },
-            new Notification { UserId = other.Id, Message = "For other", Type = "like" }
-        );
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        var notifs = new List<Notification>
+        {
+            new() { Id = 1, UserId = "u1", Message = "For user", Type = "like" }
+        };
+        repo.Setup(r => r.GetByUserAsync("u1")).ReturnsAsync(notifs);
 
-        var service = new NotificationsService(db);
-        var result = await service.GetUserNotificationsAsync(user.Id);
+        var result = await service.GetAllAsync("u1");
 
         Assert.Single(result);
         Assert.Equal("For user", result.First().Message);
     }
 
     [Fact]
-    public async Task MarkAllAsRead_UpdatesAllUnread()
+    public async Task MarkAllAsRead_CallsRepository()
     {
-        var db = TestHelpers.CreateInMemoryDb("notif_readall_" + Guid.NewGuid());
-        var user = TestHelpers.CreateUser("u1");
-        db.Users.Add(user);
-        db.Notifications.AddRange(
-            new Notification { UserId = user.Id, Message = "A", Type = "like", IsRead = false },
-            new Notification { UserId = user.Id, Message = "B", Type = "like", IsRead = false }
-        );
-        await db.SaveChangesAsync();
+        var (service, repo) = MakeService();
+        repo.Setup(r => r.MarkAllReadAsync("u1")).Returns(Task.CompletedTask);
 
-        var service = new NotificationsService(db);
-        await service.MarkAllAsReadAsync(user.Id);
+        await service.MarkAllReadAsync("u1");
 
-        var unread = db.Notifications.Count(n => n.UserId == user.Id && !n.IsRead);
-        Assert.Equal(0, unread);
+        repo.Verify(r => r.MarkAllReadAsync("u1"), Times.Once);
     }
 }

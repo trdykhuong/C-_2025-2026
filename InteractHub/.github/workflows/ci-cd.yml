@@ -27,10 +27,14 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore ${{ env.BACKEND_PATH }}
+        # Restore TESTS_PATH bao gồm cả API (do ProjectReference) lẫn các package riêng của test (xunit, Moq, coverlet)
+        run: dotnet restore ${{ env.TESTS_PATH }}
 
-      - name: Build
+      - name: Build API
         run: dotnet build ${{ env.BACKEND_PATH }} --no-restore --configuration Release
+
+      - name: Build Tests
+        run: dotnet build ${{ env.TESTS_PATH }} --no-restore --configuration Release
 
       - name: Run unit tests
         run: |

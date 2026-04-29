@@ -111,6 +111,7 @@ public class Notification
     public string  UserId   { get; set; } = string.Empty; // người nhận
     public AppUser User     { get; set; } = null!;
     public string? ActorId  { get; set; }                 // người gây ra
+    public AppUser? Actor   { get; set; }                 // navigation property cho ActorId
 }
 
 // ─── FRIENDSHIP ───────────────────────────────────────────────────────────────

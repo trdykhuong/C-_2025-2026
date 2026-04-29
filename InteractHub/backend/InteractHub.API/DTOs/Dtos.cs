@@ -206,6 +206,9 @@ public class NotificationResponseDTO
     public bool      IsRead        { get; set; }
     public DateTime  CreatedAt     { get; set; }
     public int?      RelatedPostId { get; set; }
+    public string?   ActorId       { get; set; }
+    public string?   ActorName     { get; set; }
+    public string?   ActorAvatar   { get; set; }
 }
 
 // ════════════════════════════════════════════════════════════

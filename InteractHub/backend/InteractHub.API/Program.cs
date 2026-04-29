@@ -1,5 +1,6 @@
 using System.Text;
 using InteractHub.API.Data;
+using InteractHub.API.Hubs;
 using InteractHub.API.Models;
 using InteractHub.API.Repositories;
 using InteractHub.API.Repositories.Interfaces;
@@ -95,6 +96,7 @@ builder.Services.AddScoped<UserService>();
 
 // ─── 6. SIGNALR ──────────────────────────────────────────────────────────────
 builder.Services.AddSignalR();
+builder.Services.AddScoped<IRealtimePusher, SignalRPusher>();
 
 // ─── 7. SWAGGER ──────────────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
@@ -190,6 +192,7 @@ app.UseStaticFiles(); // phục vụ wwwroot/uploads
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 // Endpoint kiểm tra server còn sống
 app.MapGet("/health", () => Results.Ok(new { status = "OK", time = DateTime.UtcNow }));
